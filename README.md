@@ -24,7 +24,7 @@ Rather than a single LLM call, the system is composed of three cooperating agent
 
 ## Architecture
 
-![architecture](docs/agentic_ai_diabetes.svg)>>
+![architecture](docs/agentic_ai_diabetes.svg)
 
 **Flow:**
 1. User submits a natural language query (e.g. *"How risky does patient 0 look?"*)
