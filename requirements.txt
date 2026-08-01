@@ -1,6 +1,0 @@
-openai
-openai-agents
-pydantic
-pandas
-numpy
-python-dotenv
