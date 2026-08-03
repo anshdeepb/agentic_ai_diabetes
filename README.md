@@ -52,7 +52,7 @@ Cleaning steps applied:
 - Identified and handled disguised missing values (zeros used as placeholders
   for missing measurements in `Glucose`, `BloodPressure`, `SkinThickness`,
   `Insulin`, `BMI`)
-- Dropped rows with small counts of missing values (<<X>> columns, under ~5% missing)
+- Dropped rows with small counts of missing values (under ~5% missing)
 - Median-imputed columns with larger gaps in missing data (`SkinThickness`, `Insulin`)
 - Added a synthetic `patient_id` for record lookup
 
@@ -76,6 +76,9 @@ Cleaning steps applied:
 ```
 
 3. Create a `.env` file in the project root with your OpenAI API key:
+```
+   OPENAI_API_KEY=your_key_here
+```
 
 ## Example Usage
 
@@ -86,6 +89,8 @@ result = await orchestrate("How risky does patient 0 look?")
 result = await orchestrate("What should patient 0 do to improve their health?")
 # → Chains through Risk Assessment, then returns a structured Recommendation
 ```
+
+![example_usage](docs/example_usage.png)
 
 ## What Makes This "Agentic"
 
