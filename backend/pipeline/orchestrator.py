@@ -1,10 +1,14 @@
-from agents import Agent, ModelSettings, RunContextWrapper, Runner
+import json
+from dataclasses import dataclass
+
+from agents import Agent, ModelSettings, RunContextWrapper, Runner, ToolCallItem
 
 from config import get_settings
 from memory.session import get_session
 from memory.state import CachedAssessment, ConversationState, StateStore
 from pipeline.models import get_model
 from pipeline.recommendation import recommendation_agent
+from pipeline.risk_model import RiskScore, get_risk_model
 from pipeline.risk_assessment import RISK_PROMPT_VERSION, risk_agent
 from pipeline.schemas import (
     ClarificationResult,
@@ -15,8 +19,10 @@ from pipeline.schemas import (
     RecommendationResult,
     RiskAssessment,
     RiskAssessmentResult,
+    RiskExplanation,
+    RiskLevel,
 )
-from pipeline.tools import patient_exists, record_hash
+from pipeline.tools import get_patient_features, patient_exists, record_hash
 
 ORCHESTRATOR_PROMPT = """Classify a diabetes-related query into one intent:
 - risk_only: the user wants to know how risky a patient's profile looks.
@@ -46,25 +52,62 @@ orchestrator_agent = Agent[ConversationState](
 )
 
 
+@dataclass
+class RiskRun:
+    assessment: RiskAssessment
+    agent_risk_level: RiskLevel
+    tools_called: set[str]
+    score: RiskScore
+
+
+def _tools_called(items: list) -> set[str]:
+    return {item.tool_name for item in items if isinstance(item, ToolCallItem) and item.tool_name}
+
+
+def assessment_cache_version() -> str:
+    return f"{RISK_PROMPT_VERSION}+{get_risk_model().version}"
+
+
+async def run_risk_assessment(patient_id: str) -> RiskRun:
+    features = get_patient_features(patient_id)
+    if features is None:
+        raise ValueError(f"patient {patient_id} not found")
+    score = get_risk_model().score(features)
+    payload = {
+        "patient_id": patient_id,
+        "record": features,
+        "model_score": score.model_dump(mode="json"),
+    }
+    run = await Runner.run(risk_agent, json.dumps(payload), max_turns=get_settings().max_turns)
+    explanation: RiskExplanation = run.final_output
+    tools_called = _tools_called(run.new_items)
+    assessment = RiskAssessment(
+        patient_id=patient_id,
+        risk_level=score.risk_band,
+        risk_score=score.probability,
+        key_factors=explanation.key_factors,
+        reasoning=explanation.reasoning,
+        used_cohort_context="get_cohort_average" in tools_called,
+        model_version=score.model_version,
+    )
+    return RiskRun(assessment, explanation.risk_level, tools_called, score)
+
+
 async def get_or_create_assessment(
     patient_id: str, state: ConversationState
 ) -> tuple[RiskAssessment, bool]:
     current_hash = record_hash(patient_id)
     model = get_model("risk")
+    version = assessment_cache_version()
     cached = state.assessments.get(patient_id)
-    if cached and cached.matches(current_hash, RISK_PROMPT_VERSION, model):
+    if cached and cached.matches(current_hash, version, model):
         return cached.assessment, True
 
-    run = await Runner.run(
-        risk_agent,
-        f"Assess risk for patient_id={patient_id}",
-        max_turns=get_settings().max_turns,
-    )
-    assessment = run.final_output.model_copy(update={"patient_id": patient_id})
+    assessment = (await run_risk_assessment(patient_id)).assessment
     state.assessments[patient_id] = CachedAssessment(
         assessment=assessment,
         record_hash=current_hash,
-        prompt_version=RISK_PROMPT_VERSION,
+        prompt_version=version,
         model=model,
     )
     return assessment, False

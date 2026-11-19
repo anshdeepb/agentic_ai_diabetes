@@ -7,7 +7,7 @@ export function resultToText(result: PipelineResult): string {
     case "risk_assessment": {
       const a = result.assessment
       return [
-        `Patient ${a.patient_id}: ${a.risk_level} risk`,
+        `Patient ${a.patient_id}: ${a.risk_level} risk${a.risk_score !== null ? ` (${Math.round(a.risk_score * 100)}%)` : ""}`,
         "",
         "Key factors:",
         ...a.key_factors.map((f) => `- ${f}`),

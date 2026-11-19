@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 from collections.abc import Awaitable, Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -12,7 +11,7 @@ from unittest.mock import patch
 from agents import Runner
 
 from evals.metrics import SuiteReport
-from pipeline.schemas import Recommendation, RiskAssessment, RiskLevel
+from pipeline.schemas import Recommendation, RiskAssessment, RiskExplanation, RiskLevel
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -38,17 +37,8 @@ def stub_downstream_agents() -> Iterator[None]:
 
     async def run(agent, input, **kwargs):
         if agent.name == "Risk":
-            match = re.search(r"patient_id=(\S+)", str(input))
-            patient_id = match.group(1) if match else "unknown"
-            return _Result(
-                RiskAssessment(
-                    patient_id=patient_id,
-                    risk_level=RiskLevel.medium,
-                    key_factors=["stub"],
-                    reasoning="stub",
-                    used_cohort_context=False,
-                )
-            )
+            band = json.loads(str(input))["model_score"]["risk_band"]
+            return _Result(RiskExplanation(risk_level=RiskLevel(band), key_factors=["stub"], reasoning="stub"))
         if agent.name == "Recommendation":
             assessment = RiskAssessment.model_validate_json(str(input))
             return _Result(
@@ -63,6 +53,7 @@ def stub_downstream_agents() -> Iterator[None]:
 class _Result:
     def __init__(self, final_output: Any):
         self.final_output = final_output
+        self.new_items: list[Any] = []
 
 
 def print_report(report: SuiteReport, max_failures: int = 10) -> None:

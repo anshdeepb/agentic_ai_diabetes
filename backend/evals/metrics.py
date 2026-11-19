@@ -15,7 +15,8 @@ FEATURE_ALIASES: dict[str, list[str]] = {
     "DiabetesPedigreeFunction": ["diabetes pedigree function", "diabetespedigreefunction", "pedigree"],
 }
 
-_NUMBER_AFTER = r"\W{0,3}(?:of|is|at|was|=|:)?\s*(\d+(?:\.\d+)?)"
+_NUMBER_AFTER = r"(\W{0,4}(?:of|is|at|was|=|:)?\s*)(\d+(?:\.\d+)?)"
+_COMPARISON = re.compile(r"[<>≤≥]")
 _REFERENCE_CONTEXT = re.compile(r"\b(?:average|averages|mean|cohort|typical|median)\b")
 _REFERENCE_WINDOW = 30
 
@@ -54,7 +55,7 @@ class SuiteReport:
         return all(m.passed for m in self.metrics)
 
 
-def ordinal_auc(positive_scores: list[int], negative_scores: list[int]) -> float:
+def ordinal_auc(positive_scores: list[float], negative_scores: list[float]) -> float:
     if not positive_scores or not negative_scores:
         return float("nan")
     wins = 0.0
@@ -90,7 +91,9 @@ def extract_numeric_claims(text: str, features: dict[str, Any]) -> list[NumericC
                 preceding = re.split(r"[.;!?]", window)[-1]
                 if _REFERENCE_CONTEXT.search(preceding):
                     continue
-                claimed = float(match.group(1))
+                if _COMPARISON.search(match.group(1)):
+                    continue
+                claimed = float(match.group(2))
                 claims.append(NumericClaim(feature, claimed, actual, _values_match(claimed, actual)))
             if matches:
                 break

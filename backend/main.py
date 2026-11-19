@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from config import get_settings
 from memory.state import StateStore
 from pipeline.preprocessing import get_dataframe
+from pipeline.risk_model import get_risk_model
 from routes.sessions import router as sessions_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -20,6 +21,7 @@ logger = logging.getLogger("api")
 async def lifespan(app: FastAPI):
     settings = get_settings()
     get_dataframe()
+    get_risk_model()
     app.state.store = StateStore(settings.db_path)
     yield
 

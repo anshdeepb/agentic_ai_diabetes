@@ -3,9 +3,11 @@ export type RiskLevel = "Low" | "Medium" | "High"
 export interface RiskAssessment {
   patient_id: string
   risk_level: RiskLevel
+  risk_score: number | null
   key_factors: string[]
   reasoning: string
   used_cohort_context: boolean
+  model_version: string | null
 }
 
 export interface Recommendation {

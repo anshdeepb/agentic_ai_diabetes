@@ -43,15 +43,6 @@ def cohort_average(age_low: int, age_high: int) -> dict[str, Any]:
 
 
 @function_tool
-def get_patient_record(patient_id: str) -> dict[str, Any]:
-    """Return the clinical measurements for one patient."""
-    features = get_patient_features(patient_id)
-    if features is None:
-        return {"error": f"patient {patient_id} not found"}
-    return {"patient_id": patient_id, **features}
-
-
-@function_tool
 def get_cohort_average(age_low: int, age_high: int) -> dict[str, Any]:
     """Return average Glucose, BMI and BloodPressure for patients aged age_low to age_high inclusive."""
     return cohort_average(age_low, age_high)

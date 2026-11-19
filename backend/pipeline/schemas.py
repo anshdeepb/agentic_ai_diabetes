@@ -11,12 +11,20 @@ class RiskLevel(str, Enum):
     high = "High"
 
 
+class RiskExplanation(BaseModel):
+    risk_level: RiskLevel = Field(description="Must equal the risk_band from the model score")
+    key_factors: list[str] = Field(description="2-4 measurements driving the risk, each with its exact value")
+    reasoning: str
+
+
 class RiskAssessment(BaseModel):
     patient_id: str
     risk_level: RiskLevel
+    risk_score: float | None = None
     key_factors: list[str] = Field(description="Which attributes are driving the risk level")
     reasoning: str
     used_cohort_context: bool = Field(description="Whether cohort comparison was needed")
+    model_version: str | None = None
 
 
 class Recommendation(BaseModel):
