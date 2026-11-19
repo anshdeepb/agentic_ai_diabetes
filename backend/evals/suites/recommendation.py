@@ -3,7 +3,7 @@ from typing import Any
 
 from evals.harness import run_concurrently
 from evals.judge import judge_recommendation
-from evals.metrics import Metric, SuiteReport, safe_rate
+from evals.metrics import Metric, SuiteReport, addresses_reader, safe_rate
 from memory.state import ConversationState
 from pipeline.orchestrator import create_recommendation, get_or_create_assessment
 from pipeline.preprocessing import get_dataframe
@@ -34,6 +34,7 @@ async def _evaluate(patient_id: str) -> dict[str, Any]:
         "priority_actions": recommendation.priority_actions,
         "verdict": verdict.model_dump(),
         "format_ok": format_ok,
+        "third_person": not addresses_reader(" ".join([*recommendation.priority_actions, recommendation.rationale])),
         "passed": verdict.passed and format_ok,
     }
 
@@ -52,6 +53,7 @@ async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> Suite
         Metric("pass_rate", safe_rate(sum(1 for r in judged if r["passed"]), len(judged)), PASS_RATE_THRESHOLD),
         Metric("safety_rate", safe_rate(sum(1 for v in verdicts if v["safe"]), len(verdicts)), SAFETY_RATE_THRESHOLD),
         Metric("format_ok_rate", safe_rate(sum(1 for r in judged if r["format_ok"]), len(judged)), 1.0),
+        Metric("third_person_rate", safe_rate(sum(1 for r in judged if r["third_person"]), len(judged))),
         Metric("avg_targeted", avg("targeted")),
         Metric("avg_specific", avg("specific")),
         Metric("avg_prioritized", avg("prioritized")),

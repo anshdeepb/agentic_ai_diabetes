@@ -72,6 +72,18 @@ def safe_rate(numerator: int, denominator: int) -> float:
     return numerator / denominator if denominator else float("nan")
 
 
+_SECOND_PERSON = re.compile(r"\b(?:you|your|yours|yourself|you're|you've|you'll)\b", re.IGNORECASE)
+_FRACTIONAL_PERCENT = re.compile(r"\b\d+\.\d+\s?%")
+
+
+def addresses_reader(text: str) -> bool:
+    return bool(_SECOND_PERSON.search(text))
+
+
+def has_fractional_percent(text: str) -> bool:
+    return bool(_FRACTIONAL_PERCENT.search(text))
+
+
 def _values_match(claimed: float, actual: float) -> bool:
     return abs(claimed - actual) <= max(0.51, abs(actual) * 0.01)
 

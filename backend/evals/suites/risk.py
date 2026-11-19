@@ -3,7 +3,16 @@ from typing import Any, cast
 import pandas as pd
 
 from evals.harness import run_concurrently
-from evals.metrics import RISK_ORDINAL, Metric, SuiteReport, extract_numeric_claims, ordinal_auc, safe_rate
+from evals.metrics import (
+    RISK_ORDINAL,
+    Metric,
+    SuiteReport,
+    addresses_reader,
+    extract_numeric_claims,
+    has_fractional_percent,
+    ordinal_auc,
+    safe_rate,
+)
 from pipeline.orchestrator import run_risk_assessment
 from pipeline.preprocessing import get_dataframe
 from pipeline.risk_model import get_risk_model
@@ -15,6 +24,8 @@ FALSE_HIGH_RATE_THRESHOLD = 0.25
 GROUNDED_RATE_THRESHOLD = 0.95
 BAND_AGREEMENT_THRESHOLD = 0.95
 COHORT_MISUSE_THRESHOLD = 0.10
+THIRD_PERSON_THRESHOLD = 0.95
+WHOLE_PERCENT_THRESHOLD = 0.95
 DEFAULT_LIMIT = 30
 COHORT_TOOL = "get_cohort_average"
 
@@ -82,6 +93,8 @@ async def _assess(row: dict[str, Any]) -> dict[str, Any]:
         "reasoning": assessment.reasoning,
         "tools_called": sorted(risk_run.tools_called),
         "claims": [vars(c) for c in extract_numeric_claims(text, features)],
+        "third_person": not addresses_reader(text),
+        "whole_percent": not has_fractional_percent(assessment.reasoning),
     }
 
 
@@ -128,6 +141,16 @@ async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> Suite
             COHORT_MISUSE_THRESHOLD,
             higher_is_better=False,
         ),
+        Metric(
+            "third_person_rate",
+            safe_rate(sum(r["third_person"] for r in scored), len(scored)),
+            THIRD_PERSON_THRESHOLD,
+        ),
+        Metric(
+            "whole_percent_rate",
+            safe_rate(sum(r["whole_percent"] for r in scored), len(scored)),
+            WHOLE_PERCENT_THRESHOLD,
+        ),
         Metric("error_rate", safe_rate(len(results) - len(scored), len(results)), 0.0, higher_is_better=False),
     ]
 
@@ -146,6 +169,10 @@ async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> Suite
             )
         if r["risk_level"] != "Medium" and used_cohort(r):
             failures.append({"patient_id": pid, "issue": f"cohort tool called for a {r['risk_level']} band"})
+        if not r["third_person"]:
+            failures.append({"patient_id": pid, "issue": "addresses the reader as 'you'", "reasoning": r["reasoning"]})
+        if not r["whole_percent"]:
+            failures.append({"patient_id": pid, "issue": "fractional percentage", "reasoning": r["reasoning"]})
 
     for r in results:
         r.pop("features", None)

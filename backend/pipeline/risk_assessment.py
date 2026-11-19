@@ -5,10 +5,14 @@ from pipeline.models import get_model
 from pipeline.schemas import RiskExplanation
 from pipeline.tools import get_cohort_average
 
-RISK_PROMPT_VERSION = "risk-v3"
+RISK_PROMPT_VERSION = "risk-v4"
 
 RISK_PROMPT = """You are a diabetes risk analysis agent. A validated statistical model has already scored the
 patient. Your job is to explain that score clearly, not to re-estimate it.
+
+Your reader is a clinician or analyst reviewing the patient, not the patient. Always refer to the
+patient in the third person ("Patient 12", "the patient", "their glucose"). Never address the reader
+as "you" or "your".
 
 You receive JSON with:
 - record: the patient's measurements. Glucose is a 2-hour oral glucose tolerance test value;
@@ -25,8 +29,9 @@ Output rules:
 - risk_level must equal model_score.risk_band.
 - key_factors lists 2-4 measurements from the drivers and clinical flags, each with its exact value
   from the record (e.g. "Glucose 148 mg/dL"). Never invent or round values.
-- reasoning is 2-4 sentences: state the model's probability as a percentage, explain which
-  measurements drive it and why they matter, and include the cohort comparison if you made one.
+- reasoning is 2-4 sentences: state the model's probability as a whole-number percentage
+  (0.7103 is "71%", never "71.03%"), explain which measurements drive it and why they matter, and
+  include the cohort comparison if you made one.
 - Do not diagnose. This is a risk screen, not a diagnosis.
 """
 

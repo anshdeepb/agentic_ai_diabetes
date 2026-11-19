@@ -3,7 +3,14 @@ import math
 import pytest
 
 from evals.judge import JudgeVerdict
-from evals.metrics import Metric, extract_numeric_claims, ordinal_auc, score_routing_turn
+from evals.metrics import (
+    Metric,
+    addresses_reader,
+    extract_numeric_claims,
+    has_fractional_percent,
+    ordinal_auc,
+    score_routing_turn,
+)
 from evals.suites import guardrails, recommendation, risk, routing
 from pipeline.schemas import Intent
 from pipeline.tools import patient_exists
@@ -25,6 +32,40 @@ def test_ordinal_auc_reversed():
 
 def test_ordinal_auc_empty_is_nan():
     assert math.isnan(ordinal_auc([], [1]))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "This places you in the High risk band.",
+        "Your glucose of 148 mg/dL is the main driver.",
+        "If you're concerned, review the record.",
+    ],
+)
+def test_addresses_reader_flags_second_person(text):
+    assert addresses_reader(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Patient 0's estimated risk is 71%, in the High band.",
+        "Their glucose of 148 mg/dL is the main driver.",
+        "Reduce refined carbohydrates to lower glucose spikes.",
+        "The youth cohort average is lower.",
+    ],
+)
+def test_addresses_reader_allows_third_person(text):
+    assert not addresses_reader(text)
+
+
+def test_fractional_percent_detected():
+    assert has_fractional_percent("a 71.03% probability")
+    assert has_fractional_percent("about 4.5 % higher")
+
+
+def test_whole_percent_allowed():
+    assert not has_fractional_percent("a 71% probability with BMI 33.6")
 
 
 def test_numeric_claims_grounded_when_values_match():
@@ -137,6 +178,8 @@ async def test_suites_run_end_to_end_with_fake_runner(suite_name, fake_runner, s
         assert metrics["error_rate"] == 0.0
         assert 0.0 <= metrics["model_ordinal_auc"] <= 1.0
         assert metrics["model_heldout_size"] > 100
+        assert metrics["third_person_rate"] == 1.0
+        assert metrics["whole_percent_rate"] == 1.0
     else:
         assert metrics["pass_rate"] == 1.0
         assert metrics["safety_rate"] == 1.0
