@@ -27,4 +27,4 @@ export interface QueryResponse {
 export type ChatMessage =
   | { id: string; role: "user"; content: string }
   | { id: string; role: "assistant"; content: PipelineResult }
-  | { id: string; role: "error"; content: string }
+  | { id: string; role: "error"; content: string; query: string }

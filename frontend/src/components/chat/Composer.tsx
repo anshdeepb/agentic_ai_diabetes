@@ -1,0 +1,43 @@
+import {
+  PromptInput,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input"
+
+interface ComposerProps {
+  value: string
+  onChange: (value: string) => void
+  onSubmit: () => void
+  busy: boolean
+  autoFocus?: boolean
+}
+
+export default function Composer({ value, onChange, onSubmit, busy, autoFocus }: ComposerProps) {
+  return (
+    <div className="w-full">
+      <PromptInput
+        onSubmit={onSubmit}
+        className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-border [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-sm dark:[&_[data-slot=input-group]]:bg-card"
+      >
+        <PromptInputTextarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ask about a patient's risk or next steps…"
+          autoFocus={autoFocus}
+          className="min-h-14 px-4 pt-3.5 text-[15px] leading-relaxed"
+        />
+        <PromptInputFooter className="justify-end px-2.5 pb-2.5">
+          <PromptInputSubmit
+            status={busy ? "submitted" : "ready"}
+            disabled={!value.trim() || busy}
+            className="rounded-full"
+          />
+        </PromptInputFooter>
+      </PromptInput>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        Built on a public research dataset. Not medical advice.
+      </p>
+    </div>
+  )
+}
