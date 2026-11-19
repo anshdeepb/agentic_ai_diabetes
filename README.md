@@ -333,7 +333,17 @@ cd ../frontend && npm install && npm run dev
 
 ## Try It
 
-![Example conversation: a risk assessment for patient 0 followed by recommendations](docs/example_usage.png)
+![Start screen with a greeting, the message box and four suggested questions](docs/screenshots/start-screen.webp)
+
+**Risk assessment.** *"What is patient 0's risk level?"* returns the model's score and band,
+an explanation grounded in the patient's measurements, and the key factors.
+
+![Risk assessment for patient 0: High risk at 71%, driven by glucose, BMI and pregnancies](docs/screenshots/risk-assessment.webp)
+
+**Follow-up recommendations.** *"What should they do about it?"* resolves "they" to patient 0,
+reuses the cached assessment, and returns prioritized lifestyle actions with the reasoning behind them.
+
+![Three prioritized recommendations for patient 0 with the "Why these actions" rationale expanded](docs/screenshots/recommendations.webp)
 
 Patient ids are the rows of the dataset, `0` to `767`.
 
