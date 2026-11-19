@@ -19,9 +19,7 @@ R = TypeVar("R")
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 
 
-async def run_concurrently(
-    items: Iterable[T], worker: Callable[[T], Awaitable[R]], concurrency: int
-) -> list[R]:
+async def run_concurrently[T, R](items: Iterable[T], worker: Callable[[T], Awaitable[R]], concurrency: int) -> list[R]:
     semaphore = asyncio.Semaphore(concurrency)
 
     async def guarded(item: T) -> R:

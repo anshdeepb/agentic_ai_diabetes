@@ -114,7 +114,7 @@ def score_routing_turn(expected: dict[str, Any], result: dict[str, Any]) -> list
 
 def _result_patient_id(result: dict[str, Any]) -> str | None:
     if result.get("type") == "recommendation":
-        return result["recommendation"]["patient_id"]
+        return str(result["recommendation"]["patient_id"])
     if result.get("type") == "risk_assessment":
-        return result["assessment"]["patient_id"]
+        return str(result["assessment"]["patient_id"])
     return None

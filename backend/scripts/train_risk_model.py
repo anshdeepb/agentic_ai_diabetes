@@ -91,8 +91,8 @@ def main() -> None:
         "intercept": float(clf.intercept_[0]),
         "bands": BANDS,
         "metrics": {
-            "train_size": int(len(y_train)),
-            "test_size": int(len(y_test)),
+            "train_size": len(y_train),
+            "test_size": len(y_test),
             "test_prevalence": float(y_test.mean()),
             "cv_auc_mean": float(cv_auc.mean()),
             "cv_auc_std": float(cv_auc.std()),
@@ -105,16 +105,18 @@ def main() -> None:
     }
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(card, indent=2))
+    args.out.write_text(json.dumps(card, indent=2) + "\n")
 
     m = card["metrics"]
     print(f"Saved {card['model_version']} to {args.out}")
-    print(f"  CV AUC {m['cv_auc_mean']:.3f} ± {m['cv_auc_std']:.3f} | test AUC {m['test_auc']:.3f} | Brier {m['test_brier']:.3f}")
+    print(
+        f"  CV AUC {m['cv_auc_mean']:.3f} ± {m['cv_auc_std']:.3f} | test AUC {m['test_auc']:.3f} | Brier {m['test_brier']:.3f}"
+    )
     for name, stats in band_stats.items():
         rate = "n/a" if stats["diabetic_rate"] is None else f"{stats['diabetic_rate']:.0%}"
         print(f"  {name:<6} n={stats['count']:<4} diabetic rate {rate}")
     print("  coefficients (per 1 SD):")
-    for feature, coef in sorted(zip(FEATURE_COLUMNS, card["coefficients"]), key=lambda x: -abs(x[1])):
+    for feature, coef in sorted(zip(FEATURE_COLUMNS, card["coefficients"], strict=True), key=lambda x: -abs(x[1])):
         print(f"    {feature:<26} {coef:+.3f}")
 
 

@@ -132,7 +132,16 @@ cd ../frontend && npm install && npm run dev
 pytest
 ```
 Unit and API tests run without network access by stubbing the agent runner.
+Warnings are treated as errors, so leaks such as unclosed database connections fail the suite.
 `python scripts/smoke_test.py` runs a live three-turn conversation against the model.
+
+## Code Quality
+
+| Tool | Command (from `backend/`) | Checks |
+|---|---|---|
+| ruff | `ruff check . && ruff format --check .` | Lint (pyflakes, bugbear, pyupgrade, import order, async) and formatting |
+| mypy | `mypy` | Static types, with the pydantic plugin and pandas stubs |
+| pytest | `pytest` | Unit, API and eval-harness tests |
 
 ## Evaluation
 

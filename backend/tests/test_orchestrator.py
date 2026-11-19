@@ -1,4 +1,6 @@
-from memory.session import get_session
+from typing import Any
+
+from memory.session import open_session
 from pipeline.orchestrator import orchestrate
 from pipeline.schemas import (
     ClarificationResult,
@@ -46,10 +48,10 @@ async def test_unknown_patient_asks_for_clarification(fake_runner, store, sessio
 
 
 async def test_conversation_history_stores_compact_summary(fake_runner, store, session_id):
-    session = get_session(session_id)
-    await session.clear_session()
-    fake_runner.queue(Intent.risk_only, "0")
-    await orchestrate("risk for patient 0?", session_id, store)
-    items = await session.get_items()
-    assert items[-1]["role"] == "assistant"
-    assert items[-1]["content"].startswith("Patient 0: High risk")
+    with open_session(session_id) as session:
+        await session.clear_session()
+        fake_runner.queue(Intent.risk_only, "0")
+        await orchestrate("risk for patient 0?", session_id, store)
+        last: dict[str, Any] = dict((await session.get_items())[-1])
+    assert last["role"] == "assistant"
+    assert str(last["content"]).startswith("Patient 0: High risk")

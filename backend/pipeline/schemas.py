@@ -1,11 +1,11 @@
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     low = "Low"
     medium = "Medium"
     high = "High"
@@ -33,7 +33,7 @@ class Recommendation(BaseModel):
     rationale: str
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     risk_only = "risk_only"
     recommendation = "recommendation"
 

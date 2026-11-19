@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -38,13 +38,21 @@ def model_metrics() -> list[Metric]:
     held_out = df[df["Patient_ID"].isin(set(model.test_patient_ids))]
     scores = [model.score(get_patient_features(pid) or {}) for pid in held_out["Patient_ID"]]
     outcomes = held_out["Outcome"].tolist()
-    pos = [s for s, y in zip(scores, outcomes) if y == 1]
-    neg = [s for s, y in zip(scores, outcomes) if y == 0]
+    pos = [s for s, y in zip(scores, outcomes, strict=True) if y == 1]
+    neg = [s for s, y in zip(scores, outcomes, strict=True) if y == 0]
     return [
         Metric("model_heldout_size", float(len(scores))),
-        Metric("model_ordinal_auc", ordinal_auc([RISK_ORDINAL[s.risk_band.value] for s in pos], [RISK_ORDINAL[s.risk_band.value] for s in neg]), ORDINAL_AUC_THRESHOLD),
+        Metric(
+            "model_ordinal_auc",
+            ordinal_auc([RISK_ORDINAL[s.risk_band.value] for s in pos], [RISK_ORDINAL[s.risk_band.value] for s in neg]),
+            ORDINAL_AUC_THRESHOLD,
+        ),
         Metric("model_probability_auc", ordinal_auc([s.probability for s in pos], [s.probability for s in neg])),
-        Metric("model_high_recall", safe_rate(sum(s.risk_band.value == "High" for s in pos), len(pos)), HIGH_RECALL_THRESHOLD),
+        Metric(
+            "model_high_recall",
+            safe_rate(sum(s.risk_band.value == "High" for s in pos), len(pos)),
+            HIGH_RECALL_THRESHOLD,
+        ),
         Metric(
             "model_false_high_rate",
             safe_rate(sum(s.risk_band.value == "High" for s in neg), len(neg)),
@@ -79,7 +87,7 @@ async def _assess(row: dict[str, Any]) -> dict[str, Any]:
 
 async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> SuiteReport:
     sample = sample_patients(limit or DEFAULT_LIMIT, seed)
-    rows = sample[["Patient_ID", "Outcome"]].to_dict("records")
+    rows = cast(list[dict[str, Any]], sample[["Patient_ID", "Outcome"]].to_dict("records"))
     results = await run_concurrently(rows, _assess, concurrency)
 
     scored = [r for r in results if "error" not in r]
@@ -96,12 +104,22 @@ async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> Suite
         *model_metrics(),
         Metric(
             "sample_ordinal_auc",
-            ordinal_auc([RISK_ORDINAL[r["risk_level"]] for r in positives], [RISK_ORDINAL[r["risk_level"]] for r in negatives]),
+            ordinal_auc(
+                [RISK_ORDINAL[r["risk_level"]] for r in positives], [RISK_ORDINAL[r["risk_level"]] for r in negatives]
+            ),
         ),
         Metric("sample_high_recall", safe_rate(sum(r["risk_level"] == "High" for r in positives), len(positives))),
         Metric("sample_false_high_rate", safe_rate(sum(r["risk_level"] == "High" for r in negatives), len(negatives))),
-        Metric("agent_band_agreement", safe_rate(sum(r["agent_risk_level"] == r["risk_level"] for r in scored), len(scored)), BAND_AGREEMENT_THRESHOLD),
-        Metric("numeric_grounding_rate", safe_rate(sum(c["grounded"] for c in claims), len(claims)), GROUNDED_RATE_THRESHOLD),
+        Metric(
+            "agent_band_agreement",
+            safe_rate(sum(r["agent_risk_level"] == r["risk_level"] for r in scored), len(scored)),
+            BAND_AGREEMENT_THRESHOLD,
+        ),
+        Metric(
+            "numeric_grounding_rate",
+            safe_rate(sum(c["grounded"] for c in claims), len(claims)),
+            GROUNDED_RATE_THRESHOLD,
+        ),
         Metric("numeric_claims_checked", float(len(claims))),
         Metric("cohort_usage_on_medium", safe_rate(sum(used_cohort(r) for r in medium), len(medium))),
         Metric(
@@ -123,7 +141,9 @@ async def run(limit: int | None, concurrency: int, seed: int, **_: Any) -> Suite
         if bad_claims:
             failures.append({"patient_id": pid, "ungrounded_claims": bad_claims})
         if r["agent_risk_level"] != r["risk_level"]:
-            failures.append({"patient_id": pid, "issue": f"agent said {r['agent_risk_level']}, model band {r['risk_level']}"})
+            failures.append(
+                {"patient_id": pid, "issue": f"agent said {r['agent_risk_level']}, model band {r['risk_level']}"}
+            )
         if r["risk_level"] != "Medium" and used_cohort(r):
             failures.append({"patient_id": pid, "issue": f"cohort tool called for a {r['risk_level']} band"})
 

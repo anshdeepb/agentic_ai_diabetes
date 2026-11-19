@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Request, status
 
-from memory.session import get_session
+from memory.session import open_session
 from memory.state import StateStore
 from pipeline.orchestrator import orchestrate
 from schemas import QueryRequest, QueryResponse
@@ -13,7 +13,8 @@ SessionId = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{8,64}$")]
 
 
 def get_store(request: Request) -> StateStore:
-    return request.app.state.store
+    store: StateStore = request.app.state.store
+    return store
 
 
 @router.post("/{session_id}/messages", response_model=QueryResponse)
@@ -31,5 +32,6 @@ async def delete_session(
     session_id: SessionId,
     store: Annotated[StateStore, Depends(get_store)],
 ) -> None:
-    await get_session(session_id).clear_session()
+    with open_session(session_id) as session:
+        await session.clear_session()
     await store.delete(session_id)

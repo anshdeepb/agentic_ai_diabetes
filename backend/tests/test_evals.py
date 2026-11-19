@@ -64,7 +64,8 @@ def test_numeric_claims_ignore_text_without_feature_numbers():
 
 def test_numeric_claims_handle_multiword_alias():
     claims = extract_numeric_claims("blood pressure of 72", FEATURES)
-    assert claims[0].feature == "BloodPressure" and claims[0].grounded
+    assert claims[0].feature == "BloodPressure"
+    assert claims[0].grounded
 
 
 def test_routing_turn_scoring():

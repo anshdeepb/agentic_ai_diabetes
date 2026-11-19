@@ -15,7 +15,8 @@ CONVERSATION_PASS_THRESHOLD = 0.85
 
 
 def load_dataset() -> list[dict[str, Any]]:
-    return json.loads(DATASET.read_text())
+    cases: list[dict[str, Any]] = json.loads(DATASET.read_text())
+    return cases
 
 
 async def _run_conversation(case: dict[str, Any], store: StateStore) -> dict[str, Any]:
@@ -47,12 +48,11 @@ async def run(store: StateStore, limit: int | None, concurrency: int, **_: Any) 
     ]
     for tag in sorted({tag for r in results for tag in r["tags"]}):
         tagged = [t for r in results if tag in r["tags"] for t in r["turns"]]
-        metrics.append(Metric(f"turn_accuracy[{tag}]", safe_rate(sum(1 for t in tagged if not t["errors"]), len(tagged))))
+        metrics.append(
+            Metric(f"turn_accuracy[{tag}]", safe_rate(sum(1 for t in tagged if not t["errors"]), len(tagged)))
+        )
 
     failures = [
-        {"id": r["id"], "user": t["user"], "errors": t["errors"]}
-        for r in results
-        for t in r["turns"]
-        if t["errors"]
+        {"id": r["id"], "user": t["user"], "errors": t["errors"]} for r in results for t in r["turns"] if t["errors"]
     ]
     return SuiteReport("routing", metrics, results, failures)

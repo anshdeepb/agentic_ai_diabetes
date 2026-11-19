@@ -49,4 +49,5 @@ async def judge_recommendation(assessment: RiskAssessment, recommendation: Recom
         f"Recommendations:\n{recommendation.model_dump_json(indent=2)}"
     )
     run = await Runner.run(judge_agent, payload, max_turns=get_settings().max_turns)
-    return run.final_output
+    verdict: JudgeVerdict = run.final_output
+    return verdict
