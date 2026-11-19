@@ -31,29 +31,57 @@ Agent outputs pass a clinical safety guardrail before anything reaches the user.
 
 ## Architecture
 
+Both diagrams use the same colours:
+
+| Colour | Meaning |
+|---|---|
+| 🟦 Blue | User-facing: the chat UI, incoming messages and returned results |
+| ⬜ Grey | Application code: API routes, the pipeline, decisions |
+| 🟪 Purple | LLM agents (OpenAI Agents SDK) |
+| 🟩 Green | Deterministic code: the trained risk model, data tools, template fallback |
+| 🟥 Red | Safety: injection rules, output guardrail, refusals |
+| 🟨 Amber | Storage and data: SQLite memory, the dataset |
+| ⬛ Black | External service: the OpenAI API |
+| 🟧 Orange | Quality gates: CI and evals (dashed, not on the request path) |
+
 ### Technical architecture
+
+Numbered arrows follow one chat message through the system.
 
 ```mermaid
 flowchart LR
-    subgraph Client["Frontend: React + TypeScript + Vite"]
-        UI["Chat UI<br/>typed result cards"]
+    subgraph Client["Frontend · React + TypeScript + Vite"]
+        UI["Chat UI<br/>one card per result type"]
     end
 
-    subgraph API["Backend: FastAPI"]
+    subgraph Backend["Backend · FastAPI"]
         Routes["REST API v1<br/>POST /v1/sessions/{id}/messages<br/>DELETE /v1/sessions/{id}"]
         Pipeline["Pipeline<br/>pipeline/orchestrator.py"]
-        Guard["Guardrails<br/>input rules + classifier<br/>output safety checks"]
-        Agents["Agents<br/>OpenAI Agents SDK"]
-        RiskModel["Risk model<br/>logistic regression, stored as JSON"]
-        Tools["Data tools<br/>patient lookup, cohort averages"]
+
+        subgraph Safety["Guardrails"]
+            Rules["Injection rules<br/>regex, no model call"]
+            OutGuard["Clinical safety check<br/>patterns, retry, fallback"]
+        end
+
+        subgraph AgentLayer["LLM agents · OpenAI Agents SDK"]
+            IG["Input Guard<br/>scope classifier"]
+            Orch["Orchestrator<br/>intent + patient"]
+            RiskAgent["Risk agent<br/>explains the score"]
+            RecAgent["Recommendation agent<br/>prioritized actions"]
+        end
+
+        subgraph Logic["Deterministic logic"]
+            RiskModel["Risk model<br/>logistic regression, JSON"]
+            Tools["Data tools<br/>patient lookup, cohort averages"]
+        end
     end
 
-    subgraph Storage["Local storage: SQLite"]
-        Sessions[("Conversation history<br/>SQLiteSession, capped")]
+    subgraph Storage["Storage"]
+        Sessions[("Conversation history<br/>SQLite, capped")]
         State[("Working state<br/>active patient, cached assessments")]
+        Data[("Pima dataset<br/>cleaned CSV")]
     end
 
-    Data[("Pima dataset<br/>cleaned CSV")]
     OpenAI["OpenAI API<br/>gpt-4o-mini"]
 
     subgraph Quality["Quality gates"]
@@ -61,18 +89,50 @@ flowchart LR
         Evals["Eval suites<br/>routing, risk, guardrails, recommendation"]
     end
 
-    UI -- "HTTP JSON" --> Routes --> Pipeline
-    Pipeline --> Guard
-    Pipeline --> Agents
-    Pipeline --> RiskModel
-    Agents --> Tools --> Data
+    UI -->|"1 · message"| Routes --> Pipeline
+    Pipeline -->|"2 · screen"| Rules
+    Pipeline -->|"3 · classify"| IG
+    Pipeline -->|"4 · route"| Orch
+    Pipeline -->|"5 · score"| RiskModel
+    Pipeline -->|"6 · explain"| RiskAgent
+    Pipeline -->|"7 · advise"| RecAgent
+    RiskAgent -.->|"Medium band"| Tools
+    RiskAgent --> OutGuard
+    RecAgent --> OutGuard
     RiskModel --> Data
-    Agents <--> OpenAI
-    Guard <--> OpenAI
-    Pipeline <--> Sessions
+    Tools --> Data
+    AgentLayer <-->|"model calls"| OpenAI
+    Pipeline <-->|"8 · load and save"| Sessions
     Pipeline <--> State
-    CI -.-> Pipeline
-    Evals -.-> Pipeline
+    Pipeline -->|"9 · typed result"| UI
+    CI -.-> Backend
+    Evals -.-> AgentLayer
+
+    classDef client fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef core fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef logic fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef guard fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef store fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef external fill:#111827,stroke:#030712,color:#f9fafb
+    classDef quality fill:#ffedd5,stroke:#ea580c,color:#7c2d12,stroke-dasharray:5 3
+
+    class UI client
+    class Routes,Pipeline core
+    class IG,Orch,RiskAgent,RecAgent agent
+    class RiskModel,Tools logic
+    class Rules,OutGuard guard
+    class Sessions,State,Data store
+    class OpenAI external
+    class CI,Evals quality
+
+    style Client fill:transparent,stroke:#2563eb
+    style Backend fill:transparent,stroke:#64748b
+    style Safety fill:transparent,stroke:#dc2626,stroke-dasharray:4 3
+    style AgentLayer fill:transparent,stroke:#7c3aed,stroke-dasharray:4 3
+    style Logic fill:transparent,stroke:#16a34a,stroke-dasharray:4 3
+    style Storage fill:transparent,stroke:#d97706
+    style Quality fill:transparent,stroke:#ea580c,stroke-dasharray:4 3
 ```
 
 | Component | Location | Responsibility |
@@ -87,33 +147,91 @@ flowchart LR
 
 ### Agent flow
 
+One turn runs in five stages. Dotted arrows are conditional: the cohort tool only for
+Medium scores, and a single retry when the safety check fails.
+
 ```mermaid
 flowchart TD
-    Q(["User message"]) --> Rules{"Injection rules<br/>regex, no model call"}
-    Rules -- "match" --> Refuse(["Refusal<br/>nothing saved to memory"])
-    Rules -- "clean" --> IG{"Input Guard agent<br/>in scope?"}
+    Q(["User message"])
+
+    subgraph S1["1 · Screen the input"]
+        Rules{"Injection rules<br/>regex, no model call"}
+        IG{"Input Guard agent<br/>in scope?"}
+    end
+
+    subgraph S2["2 · Route"]
+        Orch["Orchestrator agent<br/>reads history + state summary<br/>returns intent and patient id"]
+        Known{"Patient resolved<br/>and in dataset?"}
+    end
+
+    subgraph S3["3 · Assess risk"]
+        Cache{"Valid cached<br/>assessment?"}
+        Score["Risk model<br/>probability, band, drivers, flags"]
+        RiskAgent["Risk agent<br/>explains the score"]
+        Cohort["get_cohort_average<br/>tool"]
+        OG1{"Clinical safety<br/>check"}
+        Template["Template explanation<br/>built from the score"]
+        Assessment["Risk assessment<br/>band always from the model"]
+    end
+
+    subgraph S4["4 · Recommend"]
+        Intent{"Intent?"}
+        RecAgent["Recommendation agent<br/>sees only the assessment"]
+        OG2{"Clinical safety<br/>check"}
+    end
+
+    subgraph S5["5 · Respond and remember"]
+        RiskOut(["Risk assessment"])
+        RecOut(["Recommendation"])
+        Clarify(["Clarification"])
+        Refuse2(["Refusal<br/>review with a clinician"])
+        Memory[("Summary + state<br/>saved to SQLite")]
+    end
+
+    Refuse(["Refusal<br/>not saved to memory"])
+
+    Q --> Rules
+    Rules -- "match" --> Refuse
+    Rules -- "clean" --> IG
     IG -- "off topic, injection, unsafe" --> Refuse
-    IG -- "in scope" --> Orch["Orchestrator agent<br/>reads history and state summary<br/>returns intent and patient id"]
-    Orch --> Known{"Patient resolved<br/>and in dataset?"}
-    Known -- "no" --> Clarify(["Clarification"])
-    Known -- "yes" --> Cache{"Cached assessment<br/>still valid?"}
-    Cache -- "yes" --> Assessment
-    Cache -- "no" --> Score["Risk model<br/>probability, band, drivers, flags"]
-    Score --> RiskAgent["Risk agent<br/>explains the score"]
-    RiskAgent -- "Medium band only" --> Cohort["get_cohort_average tool"]
-    Cohort --> RiskAgent
-    RiskAgent --> OG1{"Clinical safety<br/>guardrail"}
-    OG1 -- "fail: retry once with feedback" --> RiskAgent
-    OG1 -- "pass" --> Assessment["Risk assessment<br/>band always taken from the model"]
-    OG1 -- "fails twice" --> Template["Template explanation"] --> Assessment
-    Assessment --> Intent{"Intent?"}
-    Intent -- "risk only" --> RiskOut(["Risk assessment result"])
-    Intent -- "recommendation" --> RecAgent["Recommendation agent<br/>sees only the structured assessment"]
-    RecAgent --> OG2{"Clinical safety<br/>guardrail"}
-    OG2 -- "fail: retry once with feedback" --> RecAgent
-    OG2 -- "pass" --> RecOut(["Recommendation result"])
-    OG2 -- "fails twice" --> Refuse2(["Refusal<br/>review with a clinician"])
-    RiskOut & RecOut & Clarify & Refuse2 --> Memory[("Compact summary and state<br/>saved to memory")]
+    IG -- "in scope" --> Orch --> Known
+    Known -- "no" --> Clarify
+    Known -- "yes" --> Cache
+    Cache -- "hit" --> Assessment
+    Cache -- "miss" --> Score --> RiskAgent
+    RiskAgent -. "Medium band only" .-> Cohort
+    Cohort -.-> RiskAgent
+    RiskAgent --> OG1
+    OG1 -- "pass" --> Assessment
+    OG1 -. "fail: retry once" .-> RiskAgent
+    OG1 -- "fails twice" --> Template --> Assessment
+    Assessment --> Intent
+    Intent -- "risk only" --> RiskOut
+    Intent -- "recommendation" --> RecAgent --> OG2
+    OG2 -- "pass" --> RecOut
+    OG2 -. "fail: retry once" .-> RecAgent
+    OG2 -- "fails twice" --> Refuse2
+    RiskOut & RecOut & Clarify & Refuse2 --> Memory
+
+    classDef client fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef core fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef logic fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef guard fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef store fill:#fef3c7,stroke:#d97706,color:#78350f
+
+    class Q,RiskOut,RecOut,Clarify client
+    class Known,Cache,Intent,Assessment core
+    class IG,Orch,RiskAgent,RecAgent agent
+    class Score,Cohort,Template logic
+    class Rules,OG1,OG2,Refuse,Refuse2 guard
+    class Memory store
+
+    style S1 fill:transparent,stroke:#dc2626,stroke-dasharray:4 3
+    style S2 fill:transparent,stroke:#7c3aed,stroke-dasharray:4 3
+    style S3 fill:transparent,stroke:#16a34a,stroke-dasharray:4 3
+    style S4 fill:transparent,stroke:#7c3aed,stroke-dasharray:4 3
+    style S5 fill:transparent,stroke:#2563eb,stroke-dasharray:4 3
 ```
 
 | Agent | Model | Sees | Returns | Tools |
@@ -215,6 +333,8 @@ cd ../frontend && npm install && npm run dev
 
 ## Try It
 
+![Example conversation: a risk assessment for patient 0 followed by recommendations](docs/example_usage.png)
+
 Patient ids are the rows of the dataset, `0` to `767`.
 
 | What it exercises | Example questions |
@@ -299,8 +419,6 @@ python -m evals risk --limit 40 --seed 1
 Runs use a throwaway database, print a summary, and write a full JSON report with
 per-case details to `backend/evals/reports/` (gitignored). The default run makes roughly
 150 model calls.
-
-![example_usage](docs/example_usage.png)
 
 ## Safety & Guardrails
 
