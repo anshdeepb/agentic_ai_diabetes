@@ -16,9 +16,7 @@ async def test_new_session_has_empty_state(store):
 
 async def test_state_round_trip(store):
     state = ConversationState(session_id="abc12345", active_patient_id="3")
-    state.assessments["3"] = CachedAssessment(
-        assessment=_assessment(), record_hash="h", prompt_version="v", model="m"
-    )
+    state.assessments["3"] = CachedAssessment(assessment=_assessment(), record_hash="h", prompt_version="v", model="m")
     await store.save(state)
     loaded = await store.load("abc12345")
     assert loaded.active_patient_id == "3"

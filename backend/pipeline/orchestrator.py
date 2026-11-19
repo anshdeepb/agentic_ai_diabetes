@@ -14,13 +14,13 @@ from agents import (
 )
 
 from config import get_settings
-from memory.session import get_session
+from memory.session import open_session
 from memory.state import CachedAssessment, ConversationState, StateStore
 from pipeline.guardrails import REFUSAL_MESSAGES, check_input, safety_feedback, violations_from
 from pipeline.models import get_model
 from pipeline.recommendation import recommendation_agent
-from pipeline.risk_model import RiskScore, get_risk_model
 from pipeline.risk_assessment import RISK_PROMPT_VERSION, risk_agent
+from pipeline.risk_model import RiskScore, get_risk_model
 from pipeline.schemas import (
     ClarificationResult,
     Intent,
@@ -51,9 +51,7 @@ Extract the patient_id the user refers to. Patient ids are numbers written as st
 Conversation state: {state}"""
 
 
-def orchestrator_instructions(
-    ctx: RunContextWrapper[ConversationState], agent: Agent[ConversationState]
-) -> str:
+def orchestrator_instructions(ctx: RunContextWrapper[ConversationState], agent: Agent[ConversationState]) -> str:
     return ORCHESTRATOR_PROMPT.format(state=ctx.context.summary())
 
 
@@ -140,9 +138,7 @@ async def run_risk_assessment(patient_id: str) -> RiskRun:
     return RiskRun(assessment, explanation.risk_level, tools_called, score, safety_fallback=run is None)
 
 
-async def get_or_create_assessment(
-    patient_id: str, state: ConversationState
-) -> tuple[RiskAssessment, bool]:
+async def get_or_create_assessment(patient_id: str, state: ConversationState) -> tuple[RiskAssessment, bool]:
     current_hash = record_hash(patient_id)
     model = get_model("risk")
     version = assessment_cache_version()
@@ -164,7 +160,8 @@ async def create_recommendation(assessment: RiskAssessment) -> Recommendation | 
     run = await _run_with_safety_retry(recommendation_agent, assessment.model_dump_json())
     if run is None:
         return None
-    return run.final_output.model_copy(update={"patient_id": assessment.patient_id})
+    recommendation: Recommendation = run.final_output
+    return recommendation.model_copy(update={"patient_id": assessment.patient_id})
 
 
 def summarize_result(result: PipelineResult) -> str:
@@ -185,39 +182,38 @@ async def orchestrate(query: str, session_id: str, store: StateStore) -> Pipelin
     if not check.allowed:
         return RefusalResult(category=check.category.value, message=REFUSAL_MESSAGES[check.category.value])
 
-    session = get_session(session_id)
-
-    decision_run = await Runner.run(
-        orchestrator_agent,
-        query,
-        context=state,
-        session=session,
-        max_turns=settings.max_turns,
-    )
-    decision: OrchestratorDecision = decision_run.final_output
-    patient_id = decision.patient_id or state.active_patient_id
-
-    result: PipelineResult
-    if patient_id is None:
-        result = ClarificationResult(
-            message="Which patient would you like me to look at? For example: \"What is patient 0's risk?\""
+    with open_session(session_id) as session:
+        decision_run = await Runner.run(
+            orchestrator_agent,
+            query,
+            context=state,
+            session=session,
+            max_turns=settings.max_turns,
         )
-    elif not patient_exists(patient_id):
-        result = ClarificationResult(message=f"I couldn't find a patient with id {patient_id}.")
-    else:
-        state.active_patient_id = patient_id
-        assessment, from_cache = await get_or_create_assessment(patient_id, state)
-        if decision.intent == Intent.risk_only:
-            result = RiskAssessmentResult(assessment=assessment, from_cache=from_cache)
-        else:
-            recommendation = await create_recommendation(assessment)
-            if recommendation is None:
-                result = RefusalResult(category="unsafe_output", message=REFUSAL_MESSAGES["unsafe_output"])
-            else:
-                result = RecommendationResult(
-                    assessment=assessment, recommendation=recommendation, from_cache=from_cache
-                )
+        decision: OrchestratorDecision = decision_run.final_output
+        patient_id = decision.patient_id or state.active_patient_id
 
-    await session.add_items([{"role": "assistant", "content": summarize_result(result)}])
+        result: PipelineResult
+        if patient_id is None:
+            result = ClarificationResult(
+                message='Which patient would you like me to look at? For example: "What is patient 0\'s risk?"'
+            )
+        elif not patient_exists(patient_id):
+            result = ClarificationResult(message=f"I couldn't find a patient with id {patient_id}.")
+        else:
+            state.active_patient_id = patient_id
+            assessment, from_cache = await get_or_create_assessment(patient_id, state)
+            if decision.intent == Intent.risk_only:
+                result = RiskAssessmentResult(assessment=assessment, from_cache=from_cache)
+            else:
+                recommendation = await create_recommendation(assessment)
+                if recommendation is None:
+                    result = RefusalResult(category="unsafe_output", message=REFUSAL_MESSAGES["unsafe_output"])
+                else:
+                    result = RecommendationResult(
+                        assessment=assessment, recommendation=recommendation, from_cache=from_cache
+                    )
+
+        await session.add_items([{"role": "assistant", "content": summarize_result(result)}])
     await store.save(state)
     return result

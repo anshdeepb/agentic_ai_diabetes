@@ -1,7 +1,7 @@
 import pytest
 from agents import Agent, RunContextWrapper
 
-from memory.session import get_session
+from memory.session import open_session
 from pipeline.guardrails import (
     InputCategory,
     check_input,
@@ -87,16 +87,16 @@ async def test_rule_blocks_injection_without_model_call(fake_runner):
 
 
 async def test_blocked_input_returns_refusal_and_leaves_no_trace(fake_runner, store, session_id):
-    session = get_session(session_id)
-    await session.clear_session()
-    fake_runner.guard_category = "off_topic"
+    with open_session(session_id) as session:
+        await session.clear_session()
+        fake_runner.guard_category = "off_topic"
 
-    result = await orchestrate("What's the weather today?", session_id, store)
+        result = await orchestrate("What's the weather today?", session_id, store)
 
-    assert isinstance(result, RefusalResult)
-    assert result.category == "off_topic"
-    assert fake_runner.calls == ["InputGuard"]
-    assert await session.get_items() == []
+        assert isinstance(result, RefusalResult)
+        assert result.category == "off_topic"
+        assert fake_runner.calls == ["InputGuard"]
+        assert await session.get_items() == []
     assert (await store.load(session_id)).active_patient_id is None
 
 

@@ -1,5 +1,7 @@
 import asyncio
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,11 +18,7 @@ class CachedAssessment(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def matches(self, record_hash: str, prompt_version: str, model: str) -> bool:
-        return (
-            self.record_hash == record_hash
-            and self.prompt_version == prompt_version
-            and self.model == model
-        )
+        return self.record_hash == record_hash and self.prompt_version == prompt_version and self.model == model
 
 
 class ConversationState(BaseModel):
@@ -46,8 +44,14 @@ class StateStore:
                 " updated_at TEXT NOT NULL)"
             )
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._db_path)
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self._db_path)
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _load(self, session_id: str) -> ConversationState:
         with self._connect() as conn:

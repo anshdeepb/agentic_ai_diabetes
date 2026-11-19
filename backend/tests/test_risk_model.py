@@ -30,15 +30,24 @@ def test_model_card_has_held_out_ids_and_metrics():
 def test_score_matches_logistic_formula():
     model = get_risk_model()
     features = get_patient_features("0")
+    assert features is not None
     logit = model.intercept + sum(
-        c * (float(features[f]) - m) / s for f, c, m, s in zip(model.features, model.coef, model.mean, model.scale)
+        c * (float(features[f]) - m) / s
+        for f, c, m, s in zip(model.features, model.coef, model.mean, model.scale, strict=True)
     )
     assert model.score(features).probability == pytest.approx(1 / (1 + math.exp(-logit)), abs=1e-4)
 
 
 @pytest.mark.parametrize(
     ("probability", "band"),
-    [(0.0, RiskLevel.low), (0.1999, RiskLevel.low), (0.2, RiskLevel.medium), (0.4499, RiskLevel.medium), (0.45, RiskLevel.high), (1.0, RiskLevel.high)],
+    [
+        (0.0, RiskLevel.low),
+        (0.1999, RiskLevel.low),
+        (0.2, RiskLevel.medium),
+        (0.4499, RiskLevel.medium),
+        (0.45, RiskLevel.high),
+        (1.0, RiskLevel.high),
+    ],
 )
 def test_band_boundaries(probability, band):
     assert get_risk_model().band(probability) == band
@@ -59,7 +68,10 @@ def test_drivers_are_positive_contributors_only():
 
 
 def test_clinical_flags_use_ogtt_and_diastolic_thresholds():
-    flags = {f.feature: f.flag for f in clinical_flags({**BASE, "Glucose": 205.0, "BMI": 31.0, "BloodPressure": 92.0, "Age": 50})}
+    flags = {
+        f.feature: f.flag
+        for f in clinical_flags({**BASE, "Glucose": 205.0, "BMI": 31.0, "BloodPressure": 92.0, "Age": 50})
+    }
     assert "diabetic range" in flags["Glucose"]
     assert "Obese" in flags["BMI"]
     assert "stage 2" in flags["BloodPressure"]
@@ -75,7 +87,9 @@ def test_impaired_glucose_tolerance_band():
 async def test_final_level_follows_model_even_if_agent_disagrees(fake_runner):
     fake_runner.risk_agent_level = RiskLevel.low
     run = await run_risk_assessment("0")
-    expected = get_risk_model().score(get_patient_features("0"))
+    features = get_patient_features("0")
+    assert features is not None
+    expected = get_risk_model().score(features)
     assert run.assessment.risk_level == expected.risk_band
     assert run.assessment.risk_score == expected.probability
     assert run.agent_risk_level == RiskLevel.low
@@ -92,5 +106,5 @@ async def test_cohort_flag_comes_from_actual_tool_calls(fake_runner):
 
 
 async def test_unknown_patient_raises(fake_runner):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not found"):
         await run_risk_assessment("99999")

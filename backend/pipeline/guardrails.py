@@ -1,6 +1,6 @@
 import logging
 import re
-from enum import Enum
+from enum import StrEnum
 
 from agents import (
     Agent,
@@ -19,7 +19,7 @@ from pipeline.schemas import Recommendation, RiskExplanation
 logger = logging.getLogger("guardrails")
 
 
-class InputCategory(str, Enum):
+class InputCategory(StrEnum):
     in_scope = "in_scope"
     off_topic = "off_topic"
     prompt_injection = "prompt_injection"
@@ -44,7 +44,7 @@ class InputCheck(BaseModel):
 REFUSAL_MESSAGES: dict[str, str] = {
     InputCategory.off_topic.value: (
         "I can only help with diabetes risk questions about patients in this dataset. "
-        "For example: \"What is patient 0's risk level?\" or \"What should patient 12 do to lower their risk?\""
+        'For example: "What is patient 0\'s risk level?" or "What should patient 12 do to lower their risk?"'
     ),
     InputCategory.prompt_injection.value: (
         "I can't help with that request. I can assess a patient's diabetes risk or suggest lifestyle steps."
@@ -125,11 +125,40 @@ async def check_input(text: str, state_summary: str) -> InputCheck:
 
 
 DRUG_NAMES = [
-    "metformin", "glucophage", "glipizide", "glyburide", "glimepiride", "sulfonylurea", "pioglitazone",
-    "sitagliptin", "januvia", "semaglutide", "ozempic", "wegovy", "rybelsus", "liraglutide", "victoza",
-    "dulaglutide", "trulicity", "tirzepatide", "mounjaro", "dapagliflozin", "farxiga", "empagliflozin",
-    "jardiance", "canagliflozin", "sglt2", "sglt-2", "glp-1", "dpp-4", "acarbose", "statin", "atorvastatin",
-    "lisinopril", "losartan", "amlodipine",
+    "metformin",
+    "glucophage",
+    "glipizide",
+    "glyburide",
+    "glimepiride",
+    "sulfonylurea",
+    "pioglitazone",
+    "sitagliptin",
+    "januvia",
+    "semaglutide",
+    "ozempic",
+    "wegovy",
+    "rybelsus",
+    "liraglutide",
+    "victoza",
+    "dulaglutide",
+    "trulicity",
+    "tirzepatide",
+    "mounjaro",
+    "dapagliflozin",
+    "farxiga",
+    "empagliflozin",
+    "jardiance",
+    "canagliflozin",
+    "sglt2",
+    "sglt-2",
+    "glp-1",
+    "dpp-4",
+    "acarbose",
+    "statin",
+    "atorvastatin",
+    "lisinopril",
+    "losartan",
+    "amlodipine",
 ]
 
 UNSAFE_OUTPUT_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -162,9 +191,7 @@ def _output_text(output: object) -> str:
 
 
 @output_guardrail(name="clinical_safety")
-async def clinical_safety_guardrail(
-    ctx: RunContextWrapper, agent: Agent, output: object
-) -> GuardrailFunctionOutput:
+async def clinical_safety_guardrail(ctx: RunContextWrapper, agent: Agent, output: object) -> GuardrailFunctionOutput:
     violations = find_unsafe_content(_output_text(output))
     if violations:
         logger.warning("output blocked", extra={"agent": agent.name, "violations": violations})

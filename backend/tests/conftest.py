@@ -17,8 +17,8 @@ os.environ["DB_PATH"] = str(_TMP / "test.db")
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from memory.state import StateStore
-from pipeline.guardrails import clinical_safety_guardrail
 from pipeline import orchestrator
+from pipeline.guardrails import clinical_safety_guardrail
 from pipeline.schemas import (
     Intent,
     OrchestratorDecision,
@@ -82,14 +82,18 @@ class FakeRunner:
                     reasoning="High glucose.",
                 ),
                 new_items=[
-                    ToolCallItem(agent=agent, raw_item={"type": "function_call", "name": n, "call_id": n, "arguments": "{}"})
+                    ToolCallItem(
+                        agent=agent, raw_item={"type": "function_call", "name": n, "call_id": n, "arguments": "{}"}
+                    )
                     for n in self.risk_tools_called
                 ],
             )
         if agent.name == "Recommendation":
             return SimpleNamespace(
                 final_output=Recommendation(
-                    patient_id="wrong", priority_actions=["Cut refined carbs", "Walk 30 minutes daily"], rationale="Glucose."
+                    patient_id="wrong",
+                    priority_actions=["Cut refined carbs", "Walk 30 minutes daily"],
+                    rationale="Glucose.",
                 )
             )
         if agent.name == "RecommendationJudge":

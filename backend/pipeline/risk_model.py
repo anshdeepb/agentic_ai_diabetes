@@ -52,7 +52,7 @@ class RiskModel:
     def score(self, features: dict[str, Any], top_n: int = 3) -> RiskScore:
         contributions = {
             name: coef * (float(features[name]) - mean) / scale
-            for name, coef, mean, scale in zip(self.features, self.coef, self.mean, self.scale)
+            for name, coef, mean, scale in zip(self.features, self.coef, self.mean, self.scale, strict=True)
         }
         logit = self.intercept + sum(contributions.values())
         probability = 1 / (1 + math.exp(-logit))
