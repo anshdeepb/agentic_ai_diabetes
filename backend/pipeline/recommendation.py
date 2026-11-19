@@ -1,5 +1,6 @@
 from agents import Agent, ModelSettings
 
+from pipeline.guardrails import clinical_safety_guardrail
 from pipeline.models import get_model
 from pipeline.schemas import Recommendation
 
@@ -31,4 +32,5 @@ recommendation_agent = Agent(
     model=get_model("recommendation"),
     model_settings=ModelSettings(temperature=0.3),
     output_type=Recommendation,
+    output_guardrails=[clinical_safety_guardrail],
 )

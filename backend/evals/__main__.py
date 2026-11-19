@@ -10,11 +10,11 @@ os.environ["DB_PATH"] = str(_EVAL_DB)
 
 from config import get_settings
 from evals.harness import print_report, write_report
-from evals.suites import recommendation, risk, routing
+from evals.suites import guardrails, recommendation, risk, routing
 from memory.state import StateStore
 from pipeline.models import get_model
 
-SUITES = {"routing": routing, "risk": risk, "recommendation": recommendation}
+SUITES = {"routing": routing, "guardrails": guardrails, "risk": risk, "recommendation": recommendation}
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,7 +35,7 @@ async def main() -> int:
         "suites": selected,
         "limit": args.limit,
         "seed": args.seed,
-        "models": {role: get_model(role) for role in ("orchestrator", "risk", "recommendation", "judge")},
+        "models": {role: get_model(role) for role in ("orchestrator", "risk", "recommendation", "guard", "judge")},
     }
     print(f"Running {', '.join(selected)} with models {run_config['models']}")
 

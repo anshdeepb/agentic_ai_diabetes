@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     orchestrator_model: str | None = None
     risk_model: str | None = None
     recommendation_model: str | None = None
+    guard_model: str | None = None
     judge_model: str = "gpt-4o"
 
     data_path: Path = BACKEND_DIR / "data" / "archive" / "diabetes.csv"

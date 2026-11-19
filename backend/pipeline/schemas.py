@@ -73,7 +73,13 @@ class ClarificationResult(BaseModel):
     message: str
 
 
+class RefusalResult(BaseModel):
+    type: Literal["refusal"] = "refusal"
+    category: str
+    message: str
+
+
 PipelineResult = Annotated[
-    RiskAssessmentResult | RecommendationResult | ClarificationResult,
+    RiskAssessmentResult | RecommendationResult | ClarificationResult | RefusalResult,
     Field(discriminator="type"),
 ]

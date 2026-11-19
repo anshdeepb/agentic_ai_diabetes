@@ -3,6 +3,7 @@ import type { PipelineResult } from "@/types/message"
 export function resultToText(result: PipelineResult): string {
   switch (result.type) {
     case "clarification":
+    case "refusal":
       return result.message
     case "risk_assessment": {
       const a = result.assessment
