@@ -42,7 +42,7 @@ export default function ChatMessageRow({ message, onRetry }: ChatMessageRowProps
   if (message.role === "user") {
     return (
       <Message from="user">
-        <MessageContent className="group-[.is-user]:rounded-2xl group-[.is-user]:px-4 group-[.is-user]:py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap">
+        <MessageContent className="group-[.is-user]:rounded-2xl group-[.is-user]:px-4 group-[.is-user]:py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap">
           {message.content}
         </MessageContent>
       </Message>

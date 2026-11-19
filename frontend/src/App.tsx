@@ -10,7 +10,9 @@ import Composer from "@/components/chat/Composer"
 import { EmptyGreeting, SuggestionGrid } from "@/components/chat/EmptyState"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import { ApiError, deleteSession, getSessionId, newSessionId, sendMessage } from "@/lib/api"
+import { CONTENT_WIDTH, PAGE_GUTTER } from "@/lib/layout"
 import { useTheme } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/types/message"
 
 export default function App() {
@@ -66,8 +68,8 @@ export default function App() {
       />
 
       {isEmpty ? (
-        <main className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh]">
-          <div className="flex w-full max-w-2xl flex-col items-center gap-8">
+        <main className={cn("flex flex-1 flex-col items-center justify-center pb-[12vh]", PAGE_GUTTER)}>
+          <div className={cn("flex flex-col items-center gap-8", CONTENT_WIDTH)}>
             <EmptyGreeting />
             <Composer value={input} onChange={setInput} onSubmit={() => ask(input)} busy={busy} autoFocus />
             <SuggestionGrid onPick={(prompt) => ask(prompt)} disabled={busy} />
@@ -76,7 +78,7 @@ export default function App() {
       ) : (
         <main className="flex min-h-0 flex-1 flex-col">
           <Conversation className="flex-1">
-            <ConversationContent className="mx-auto w-full max-w-2xl gap-8 px-4 py-6">
+            <ConversationContent className={cn("mx-auto gap-8 py-6", CONTENT_WIDTH, PAGE_GUTTER)}>
               {messages.map((m) => (
                 <ChatMessageRow
                   key={m.id}
@@ -88,7 +90,7 @@ export default function App() {
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
-          <div className="mx-auto w-full max-w-2xl px-4 pb-4 pt-2">
+          <div className={cn("mx-auto pb-4 pt-2", CONTENT_WIDTH, PAGE_GUTTER)}>
             <Composer value={input} onChange={setInput} onSubmit={() => ask(input)} busy={busy} autoFocus />
           </div>
         </main>

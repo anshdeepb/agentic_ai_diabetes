@@ -1,7 +1,9 @@
 import { Moon, SquarePen, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import BrandMark from "@/components/chat/BrandMark"
+import { PAGE_GUTTER } from "@/lib/layout"
 import type { Theme } from "@/lib/theme"
+import { cn } from "@/lib/utils"
 
 interface AppHeaderProps {
   theme: Theme
@@ -13,7 +15,7 @@ interface AppHeaderProps {
 export default function AppHeader({ theme, onToggleTheme, onNewChat, canStartNewChat }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
+      <div className={cn("flex h-14 w-full items-center justify-between", PAGE_GUTTER)}>
         <div className="flex items-center gap-2.5">
           <BrandMark />
           <span className="text-sm font-medium tracking-tight">Diabetes Risk Assistant</span>

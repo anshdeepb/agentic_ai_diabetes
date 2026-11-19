@@ -25,7 +25,7 @@ export default function Composer({ value, onChange, onSubmit, busy, autoFocus }:
           onChange={(e) => onChange(e.target.value)}
           placeholder="Ask about a patient's risk or next steps…"
           autoFocus={autoFocus}
-          className="min-h-14 px-4 pt-3.5 text-[15px] leading-relaxed"
+          className="min-h-14 px-4 pt-3.5 text-[0.9375rem] leading-relaxed"
         />
         <PromptInputFooter className="justify-end px-2.5 pb-2.5">
           <PromptInputSubmit
