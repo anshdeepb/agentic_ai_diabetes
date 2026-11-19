@@ -1,5 +1,7 @@
 # Agentic Diabetes Risk Assistant
 
+[![CI](https://github.com/anshdeepb/agentic_ai_diabetes/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/anshdeepb/agentic_ai_diabetes/actions/workflows/ci.yml)
+
 A multi-agent AI system that assesses diabetes risk and generates targeted health
 recommendations, built with the OpenAI Agents SDK. An orchestrator agent classifies
 user intent and routes requests to specialized agents, each with structured,
@@ -142,6 +144,12 @@ Warnings are treated as errors, so leaks such as unclosed database connections f
 | ruff | `ruff check . && ruff format --check .` | Lint (pyflakes, bugbear, pyupgrade, import order, async) and formatting |
 | mypy | `mypy` | Static types, with the pydantic plugin and pandas stubs |
 | pytest | `pytest` | Unit, API and eval-harness tests |
+| eslint, build | `npm run lint && npm run build` (from `frontend/`) | Frontend lint and type-checked production build |
+
+GitHub Actions runs all of these on every push and pull request to `dev` and `main`
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). CI never needs an OpenAI key: the tests
+stub the agent runner. Actions are pinned to commit hashes and the workflow token is read-only.
+The live eval suites call the real models and are run manually.
 
 ## Evaluation
 
