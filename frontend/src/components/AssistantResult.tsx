@@ -56,7 +56,7 @@ function AssessmentView({ assessment, fromCache }: { assessment: RiskAssessment;
         <RiskPill level={assessment.risk_level} score={assessment.risk_score} />
       </div>
 
-      <p className="text-[15px] leading-relaxed">{assessment.reasoning}</p>
+      <p className="text-[0.9375rem] leading-relaxed">{assessment.reasoning}</p>
 
       {assessment.key_factors.length > 0 && (
         <div className="space-y-2">
@@ -101,7 +101,7 @@ function RecommendationView({ recommendation }: { recommendation: Recommendation
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">
               {i + 1}
             </span>
-            <span className="pt-0.5 text-[15px] leading-relaxed">{action}</span>
+            <span className="pt-0.5 text-[0.9375rem] leading-relaxed">{action}</span>
           </li>
         ))}
       </ol>
@@ -122,12 +122,12 @@ function RecommendationView({ recommendation }: { recommendation: Recommendation
 export default function AssistantResult({ result }: { result: PipelineResult }) {
   switch (result.type) {
     case "clarification":
-      return <p className="text-[15px] leading-relaxed">{result.message}</p>
+      return <p className="text-[0.9375rem] leading-relaxed">{result.message}</p>
     case "refusal":
       return (
         <div className="flex gap-2.5 rounded-xl border border-border bg-muted/40 px-3.5 py-3">
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <p className="text-[15px] leading-relaxed">{result.message}</p>
+          <p className="text-[0.9375rem] leading-relaxed">{result.message}</p>
         </div>
       )
     case "risk_assessment":
