@@ -1,22 +1,30 @@
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     low = "Low"
     medium = "Medium"
     high = "High"
 
 
+class RiskExplanation(BaseModel):
+    risk_level: RiskLevel = Field(description="Must equal the risk_band from the model score")
+    key_factors: list[str] = Field(description="2-4 measurements driving the risk, each with its exact value")
+    reasoning: str
+
+
 class RiskAssessment(BaseModel):
     patient_id: str
     risk_level: RiskLevel
+    risk_score: float | None = None
     key_factors: list[str] = Field(description="Which attributes are driving the risk level")
     reasoning: str
     used_cohort_context: bool = Field(description="Whether cohort comparison was needed")
+    model_version: str | None = None
 
 
 class Recommendation(BaseModel):
@@ -25,7 +33,7 @@ class Recommendation(BaseModel):
     rationale: str
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     risk_only = "risk_only"
     recommendation = "recommendation"
 
@@ -65,7 +73,13 @@ class ClarificationResult(BaseModel):
     message: str
 
 
+class RefusalResult(BaseModel):
+    type: Literal["refusal"] = "refusal"
+    category: str
+    message: str
+
+
 PipelineResult = Annotated[
-    RiskAssessmentResult | RecommendationResult | ClarificationResult,
+    RiskAssessmentResult | RecommendationResult | ClarificationResult | RefusalResult,
     Field(discriminator="type"),
 ]

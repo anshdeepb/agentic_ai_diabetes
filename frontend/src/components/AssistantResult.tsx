@@ -1,73 +1,138 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import type { PipelineResult, Recommendation, RiskAssessment } from "@/types/message"
+import { ChevronDown, History, ShieldAlert, Users } from "lucide-react"
+import type { ReactNode } from "react"
+import { MessageResponse } from "@/components/ai-elements/message"
+import { cn } from "@/lib/utils"
+import type { PipelineResult, Recommendation, RiskAssessment, RiskLevel } from "@/types/message"
 
-const RISK_STYLES: Record<RiskAssessment["risk_level"], string> = {
-  Low: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  Medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  High: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+const RISK_STYLES: Record<RiskLevel, { pill: string; dot: string }> = {
+  Low: {
+    pill: "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20 dark:text-emerald-400 dark:ring-emerald-400/25",
+    dot: "bg-emerald-500",
+  },
+  Medium: {
+    pill: "bg-amber-500/10 text-amber-700 ring-amber-600/20 dark:text-amber-400 dark:ring-amber-400/25",
+    dot: "bg-amber-500",
+  },
+  High: {
+    pill: "bg-rose-500/10 text-rose-700 ring-rose-600/20 dark:text-rose-400 dark:ring-rose-400/25",
+    dot: "bg-rose-500",
+  },
 }
 
-function AssessmentCard({ assessment, fromCache }: { assessment: RiskAssessment; fromCache: boolean }) {
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</p>
+}
+
+function MetaTag({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <Card className="border-border/50 bg-card/50">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-muted-foreground">Patient {assessment.patient_id}</span>
-          <div className="flex items-center gap-2">
-            {fromCache && (
-              <Badge variant="outline" className="text-muted-foreground">
-                from memory
-              </Badge>
-            )}
-            <Badge variant="outline" className={RISK_STYLES[assessment.risk_level]}>
-              {assessment.risk_level} risk
-            </Badge>
-          </div>
-        </div>
-        <ul className="space-y-1">
-          {assessment.key_factors.map((f) => (
-            <li key={f} className="text-sm flex gap-2">
-              <span className="text-muted-foreground">·</span>
-              {f}
-            </li>
-          ))}
-        </ul>
-        <p className="text-sm text-muted-foreground border-t border-border/50 pt-3">{assessment.reasoning}</p>
-      </CardContent>
-    </Card>
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5">
+      {icon}
+      {children}
+    </span>
   )
 }
 
-function RecommendationCard({ recommendation }: { recommendation: Recommendation }) {
+function RiskPill({ level, score }: { level: RiskLevel; score: number | null }) {
+  const style = RISK_STYLES[level]
   return (
-    <Card className="border-border/50 bg-card/50">
-      <CardContent className="p-4 space-y-3">
-        <span className="text-sm text-muted-foreground">
-          Patient {recommendation.patient_id} — recommendations
-        </span>
-        <ol className="space-y-1.5">
-          {recommendation.priority_actions.map((a, i) => (
-            <li key={a} className="text-sm flex gap-2">
-              <span className="text-muted-foreground font-mono text-xs mt-0.5">{i + 1}.</span>
-              {a}
-            </li>
-          ))}
-        </ol>
-        <p className="text-sm text-muted-foreground border-t border-border/50 pt-3">{recommendation.rationale}</p>
-      </CardContent>
-    </Card>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
+        style.pill
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", style.dot)} />
+      {level} risk
+      {score !== null && <span className="font-normal opacity-80 tabular-nums">· {Math.round(score * 100)}%</span>}
+    </span>
+  )
+}
+
+function AssessmentView({ assessment, fromCache }: { assessment: RiskAssessment; fromCache: boolean }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="text-base font-semibold tracking-tight">Patient {assessment.patient_id}</h3>
+        <RiskPill level={assessment.risk_level} score={assessment.risk_score} />
+      </div>
+
+      <p className="text-[0.9375rem] leading-relaxed">{assessment.reasoning}</p>
+
+      {assessment.key_factors.length > 0 && (
+        <div className="space-y-2">
+          <SectionLabel>Key factors</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {assessment.key_factors.map((factor) => (
+              <span key={factor} className="rounded-md bg-muted px-2 py-1 text-xs text-foreground/90">
+                {factor}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(assessment.used_cohort_context || fromCache) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {assessment.used_cohort_context && <MetaTag icon={<Users />}>Compared with age cohort</MetaTag>}
+          {fromCache && <MetaTag icon={<History />}>Reused from earlier in this chat</MetaTag>}
+        </div>
+      )}
+
+      {assessment.risk_score !== null && (
+        <p className="text-xs text-muted-foreground">
+          Score from a logistic regression model trained on this dataset
+          {assessment.model_version ? ` (${assessment.model_version})` : ""}. A screening estimate, not a diagnosis.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function RecommendationView({ recommendation }: { recommendation: Recommendation }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-base font-semibold tracking-tight">
+        Recommendations for patient {recommendation.patient_id}
+      </h3>
+
+      <ol className="space-y-3">
+        {recommendation.priority_actions.map((action, i) => (
+          <li key={action} className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">
+              {i + 1}
+            </span>
+            <span className="pt-0.5 text-[0.9375rem] leading-relaxed">{action}</span>
+          </li>
+        ))}
+      </ol>
+
+      <details className="group rounded-xl border border-border">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+          Why these actions
+          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="border-t border-border px-3.5 py-3 text-sm leading-relaxed text-foreground/90">
+          <MessageResponse>{recommendation.rationale}</MessageResponse>
+        </div>
+      </details>
+    </div>
   )
 }
 
 export default function AssistantResult({ result }: { result: PipelineResult }) {
   switch (result.type) {
     case "clarification":
-      return <p className="text-sm">{result.message}</p>
+      return <p className="text-[0.9375rem] leading-relaxed">{result.message}</p>
+    case "refusal":
+      return (
+        <div className="flex gap-2.5 rounded-xl border border-border bg-muted/40 px-3.5 py-3">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <p className="text-[0.9375rem] leading-relaxed">{result.message}</p>
+        </div>
+      )
     case "risk_assessment":
-      return <AssessmentCard assessment={result.assessment} fromCache={result.from_cache} />
+      return <AssessmentView assessment={result.assessment} fromCache={result.from_cache} />
     case "recommendation":
-      return <RecommendationCard recommendation={result.recommendation} />
-
+      return <RecommendationView recommendation={result.recommendation} />
   }
 }
