@@ -19,6 +19,8 @@ async def _evaluate(patient_id: str) -> dict[str, Any]:
         state = ConversationState(session_id=f"eval-rec-{patient_id}")
         assessment, _ = await get_or_create_assessment(patient_id, state)
         recommendation = await create_recommendation(assessment)
+        if recommendation is None:
+            return {"patient_id": patient_id, "error": "blocked by output guardrail after retry"}
         verdict = await judge_recommendation(assessment, recommendation)
     except Exception as exc:
         return {"patient_id": patient_id, "error": repr(exc)}

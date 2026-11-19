@@ -114,8 +114,8 @@
     "turns": [{"user": "Risk for patient 99999", "expect": {"type": "clarification"}}]
   },
   {
-    "id": "clarify_off_topic",
-    "tags": ["single_turn", "clarification", "off_topic"],
-    "turns": [{"user": "What's the weather like today?", "expect": {"type": "clarification"}}]
+    "id": "refuse_off_topic",
+    "tags": ["single_turn", "refusal", "off_topic"],
+    "turns": [{"user": "What's the weather like today?", "expect": {"type": "refusal"}}]
   }
 ]

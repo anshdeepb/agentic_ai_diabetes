@@ -20,6 +20,7 @@ export type PipelineResult =
   | { type: "risk_assessment"; assessment: RiskAssessment; from_cache: boolean }
   | { type: "recommendation"; assessment: RiskAssessment; recommendation: Recommendation; from_cache: boolean }
   | { type: "clarification"; message: string }
+  | { type: "refusal"; category: string; message: string }
 
 export interface QueryResponse {
   session_id: string

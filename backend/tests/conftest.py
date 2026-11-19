@@ -5,13 +5,19 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from agents import ToolCallItem
+from agents import (
+    GuardrailFunctionOutput,
+    OutputGuardrailResult,
+    OutputGuardrailTripwireTriggered,
+    ToolCallItem,
+)
 
 _TMP = Path(tempfile.mkdtemp())
 os.environ["DB_PATH"] = str(_TMP / "test.db")
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from memory.state import StateStore
+from pipeline.guardrails import clinical_safety_guardrail
 from pipeline import orchestrator
 from pipeline.schemas import (
     Intent,
@@ -38,12 +44,30 @@ class FakeRunner:
         self.decisions: list[OrchestratorDecision] = []
         self.risk_agent_level: RiskLevel | None = None
         self.risk_tools_called: list[str] = []
+        self.guard_category: str = "in_scope"
+        self.output_trips: dict[str, int] = {}
 
     def queue(self, intent: Intent, patient_id: str | None):
         self.decisions.append(OrchestratorDecision(intent=intent, patient_id=patient_id, reasoning="test"))
 
     async def run(self, agent, input, **kwargs):
         self.calls.append(agent.name)
+        if isinstance(input, list):
+            input = input[0]["content"]
+        if self.output_trips.get(agent.name, 0) > 0:
+            self.output_trips[agent.name] -= 1
+            raise OutputGuardrailTripwireTriggered(
+                OutputGuardrailResult(
+                    guardrail=clinical_safety_guardrail,
+                    agent_output=None,
+                    agent=agent,
+                    output=GuardrailFunctionOutput(output_info={"violations": ["drug_name"]}, tripwire_triggered=True),
+                )
+            )
+        if agent.name == "InputGuard":
+            from pipeline.guardrails import InputVerdict
+
+            return SimpleNamespace(final_output=InputVerdict(category=self.guard_category, reason="test"))
         if agent.name == "Orchestrator":
             session = kwargs.get("session")
             if session is not None:

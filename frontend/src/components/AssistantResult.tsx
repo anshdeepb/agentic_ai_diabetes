@@ -1,4 +1,4 @@
-import { ChevronDown, History, Users } from "lucide-react"
+import { ChevronDown, History, ShieldAlert, Users } from "lucide-react"
 import type { ReactNode } from "react"
 import { MessageResponse } from "@/components/ai-elements/message"
 import { cn } from "@/lib/utils"
@@ -123,6 +123,13 @@ export default function AssistantResult({ result }: { result: PipelineResult }) 
   switch (result.type) {
     case "clarification":
       return <p className="text-[15px] leading-relaxed">{result.message}</p>
+    case "refusal":
+      return (
+        <div className="flex gap-2.5 rounded-xl border border-border bg-muted/40 px-3.5 py-3">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <p className="text-[15px] leading-relaxed">{result.message}</p>
+        </div>
+      )
     case "risk_assessment":
       return <AssessmentView assessment={result.assessment} fromCache={result.from_cache} />
     case "recommendation":

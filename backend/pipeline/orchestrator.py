@@ -1,11 +1,22 @@
 import json
+import logging
 from dataclasses import dataclass
 
-from agents import Agent, ModelSettings, RunContextWrapper, Runner, ToolCallItem
+from agents import (
+    Agent,
+    ModelSettings,
+    OutputGuardrailTripwireTriggered,
+    RunContextWrapper,
+    Runner,
+    RunResult,
+    ToolCallItem,
+    TResponseInputItem,
+)
 
 from config import get_settings
 from memory.session import get_session
 from memory.state import CachedAssessment, ConversationState, StateStore
+from pipeline.guardrails import REFUSAL_MESSAGES, check_input, safety_feedback, violations_from
 from pipeline.models import get_model
 from pipeline.recommendation import recommendation_agent
 from pipeline.risk_model import RiskScore, get_risk_model
@@ -17,12 +28,15 @@ from pipeline.schemas import (
     PipelineResult,
     Recommendation,
     RecommendationResult,
+    RefusalResult,
     RiskAssessment,
     RiskAssessmentResult,
     RiskExplanation,
     RiskLevel,
 )
 from pipeline.tools import get_patient_features, patient_exists, record_hash
+
+logger = logging.getLogger("orchestrator")
 
 ORCHESTRATOR_PROMPT = """Classify a diabetes-related query into one intent:
 - risk_only: the user wants to know how risky a patient's profile looks.
@@ -58,6 +72,37 @@ class RiskRun:
     agent_risk_level: RiskLevel
     tools_called: set[str]
     score: RiskScore
+    safety_fallback: bool = False
+
+
+async def _run_with_safety_retry(agent: Agent, agent_input: str) -> RunResult | None:
+    max_turns = get_settings().max_turns
+    try:
+        return await Runner.run(agent, agent_input, max_turns=max_turns)
+    except OutputGuardrailTripwireTriggered as exc:
+        feedback = safety_feedback(violations_from(exc))
+    try:
+        retry_input: list[TResponseInputItem] = [
+            {"role": "user", "content": agent_input},
+            {"role": "user", "content": feedback},
+        ]
+        return await Runner.run(agent, retry_input, max_turns=max_turns)
+    except OutputGuardrailTripwireTriggered:
+        logger.warning("output blocked after retry", extra={"agent": agent.name})
+        return None
+
+
+def _fallback_explanation(score: RiskScore) -> RiskExplanation:
+    drivers = [f"{d.feature} {d.value:g}" for d in score.drivers] or ["No single measurement stands out"]
+    return RiskExplanation(
+        risk_level=score.risk_band,
+        key_factors=drivers,
+        reasoning=(
+            f"The risk model estimates a {score.probability:.0%} probability of diabetes, which falls in the "
+            f"{score.risk_band.value} band. The measurements contributing most are: {', '.join(drivers)}. "
+            "This is a screening estimate, not a diagnosis."
+        ),
+    )
 
 
 def _tools_called(items: list) -> set[str]:
@@ -78,9 +123,11 @@ async def run_risk_assessment(patient_id: str) -> RiskRun:
         "record": features,
         "model_score": score.model_dump(mode="json"),
     }
-    run = await Runner.run(risk_agent, json.dumps(payload), max_turns=get_settings().max_turns)
-    explanation: RiskExplanation = run.final_output
-    tools_called = _tools_called(run.new_items)
+    run = await _run_with_safety_retry(risk_agent, json.dumps(payload))
+    if run is None:
+        explanation, tools_called = _fallback_explanation(score), set()
+    else:
+        explanation, tools_called = run.final_output, _tools_called(run.new_items)
     assessment = RiskAssessment(
         patient_id=patient_id,
         risk_level=score.risk_band,
@@ -90,7 +137,7 @@ async def run_risk_assessment(patient_id: str) -> RiskRun:
         used_cohort_context="get_cohort_average" in tools_called,
         model_version=score.model_version,
     )
-    return RiskRun(assessment, explanation.risk_level, tools_called, score)
+    return RiskRun(assessment, explanation.risk_level, tools_called, score, safety_fallback=run is None)
 
 
 async def get_or_create_assessment(
@@ -113,17 +160,15 @@ async def get_or_create_assessment(
     return assessment, False
 
 
-async def create_recommendation(assessment: RiskAssessment) -> Recommendation:
-    run = await Runner.run(
-        recommendation_agent,
-        assessment.model_dump_json(),
-        max_turns=get_settings().max_turns,
-    )
+async def create_recommendation(assessment: RiskAssessment) -> Recommendation | None:
+    run = await _run_with_safety_retry(recommendation_agent, assessment.model_dump_json())
+    if run is None:
+        return None
     return run.final_output.model_copy(update={"patient_id": assessment.patient_id})
 
 
 def summarize_result(result: PipelineResult) -> str:
-    if isinstance(result, ClarificationResult):
+    if isinstance(result, (ClarificationResult, RefusalResult)):
         return result.message
     a = result.assessment
     text = f"Patient {a.patient_id}: {a.risk_level.value} risk ({', '.join(a.key_factors)})."
@@ -135,6 +180,11 @@ def summarize_result(result: PipelineResult) -> str:
 async def orchestrate(query: str, session_id: str, store: StateStore) -> PipelineResult:
     settings = get_settings()
     state = await store.load(session_id)
+
+    check = await check_input(query, state.summary())
+    if not check.allowed:
+        return RefusalResult(category=check.category.value, message=REFUSAL_MESSAGES[check.category.value])
+
     session = get_session(session_id)
 
     decision_run = await Runner.run(
@@ -161,9 +211,12 @@ async def orchestrate(query: str, session_id: str, store: StateStore) -> Pipelin
             result = RiskAssessmentResult(assessment=assessment, from_cache=from_cache)
         else:
             recommendation = await create_recommendation(assessment)
-            result = RecommendationResult(
-                assessment=assessment, recommendation=recommendation, from_cache=from_cache
-            )
+            if recommendation is None:
+                result = RefusalResult(category="unsafe_output", message=REFUSAL_MESSAGES["unsafe_output"])
+            else:
+                result = RecommendationResult(
+                    assessment=assessment, recommendation=recommendation, from_cache=from_cache
+                )
 
     await session.add_items([{"role": "assistant", "content": summarize_result(result)}])
     await store.save(state)

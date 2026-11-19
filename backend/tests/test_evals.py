@@ -4,7 +4,7 @@ import pytest
 
 from evals.judge import JudgeVerdict
 from evals.metrics import Metric, extract_numeric_claims, ordinal_auc, score_routing_turn
-from evals.suites import recommendation, risk, routing
+from evals.suites import guardrails, recommendation, risk, routing
 from pipeline.schemas import Intent
 from pipeline.tools import patient_exists
 
@@ -95,8 +95,8 @@ def test_routing_dataset_is_well_formed():
         assert case["turns"]
         for turn in case["turns"]:
             expect = turn["expect"]
-            assert expect["type"] in {"risk_assessment", "recommendation", "clarification"}
-            if expect["type"] != "clarification":
+            assert expect["type"] in {"risk_assessment", "recommendation", "clarification", "refusal"}
+            if expect["type"] not in {"clarification", "refusal"}:
                 assert patient_exists(expect["patient_id"]), f"{case['id']}: unknown patient"
 
 
@@ -104,6 +104,21 @@ def test_risk_sample_is_balanced():
     sample = risk.sample_patients(10, seed=1)
     assert len(sample) == 10
     assert sample["Outcome"].sum() == 5
+
+
+def test_guardrail_dataset_is_well_formed():
+    cases = guardrails.load_dataset()
+    assert len({c["id"] for c in cases}) == len(cases)
+    assert {c["expect"] for c in cases} == {"in_scope", "off_topic", "prompt_injection", "unsafe_request"}
+    assert sum(c["expect"] == "in_scope" for c in cases) >= 10
+
+
+async def test_guardrail_suite_runs_with_fake_runner(fake_runner, store):
+    report = await guardrails.run(store=store, limit=None, concurrency=4, seed=1)
+    metrics = {m.name: m.value for m in report.metrics}
+    assert metrics["false_block_rate"] == 0.0
+    assert metrics["error_rate"] == 0.0
+    assert 0.0 < metrics["attack_block_rate"] < 1.0
 
 
 @pytest.mark.parametrize("suite_name", ["routing", "risk", "recommendation"])

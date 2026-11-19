@@ -1,5 +1,6 @@
 from agents import Agent, ModelSettings
 
+from pipeline.guardrails import clinical_safety_guardrail
 from pipeline.models import get_model
 from pipeline.schemas import RiskExplanation
 from pipeline.tools import get_cohort_average
@@ -36,4 +37,5 @@ risk_agent = Agent(
     model_settings=ModelSettings(temperature=0.2),
     tools=[get_cohort_average],
     output_type=RiskExplanation,
+    output_guardrails=[clinical_safety_guardrail],
 )

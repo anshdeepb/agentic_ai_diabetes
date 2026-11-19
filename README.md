@@ -22,6 +22,9 @@ Rather than a single LLM call, the system is composed of three cooperating agent
   concrete, prioritized lifestyle recommendations targeted at the specific
   risk factors identified.
 
+Every request is screened by input guardrails, and agent outputs by a clinical safety
+guardrail, before anything reaches the user.
+
 ## Architecture
 
 ![architecture](docs/agentic_ai_diabetes.svg)
@@ -141,6 +144,7 @@ suite fails, so it can gate CI.
 |---|---|---|---|
 | `routing` | Does the orchestrator pick the right intent and patient, including follow-ups and clarifications? | 20 golden conversations (`evals/datasets/routing.json`); downstream agents are stubbed so only routing is tested | turn accuracy, conversation pass rate, accuracy per tag |
 | `risk` | Does the risk level agree with the real diagnosis, are cited numbers real, and does the agent use tools as intended? | Balanced sample of held-out patients scored against the `Outcome` label, which agents never see | ordinal and probability AUC, High recall, false-High rate, agent/model band agreement, numeric grounding, cohort-tool use outside borderline cases |
+| `guardrails` | Are attacks blocked without blocking real users? | 40 cases (`evals/datasets/guardrails.json`): 21 off-topic, injection and unsafe requests, and 19 legitimate questions including follow-ups and near-misses | attack block rate ≥ 0.90, false block rate ≤ 0.05, block rate per category |
 | `recommendation` | Are actions targeted, specific, prioritized and safe? | LLM-as-judge (`JUDGE_MODEL`, default `gpt-4o`) with a rubric, plus format checks | pass rate, safety rate, average rubric scores |
 
 ```bash
@@ -155,6 +159,25 @@ per-case details to `backend/evals/reports/` (gitignored). The default run makes
 150 model calls.
 
 ![example_usage](docs/example_usage.png)
+
+## Safety & Guardrails
+
+Every message and every agent output passes through layered checks.
+
+| Layer | What it checks | How |
+|---|---|---|
+| Input rules | Blatant prompt injection ("ignore previous instructions", "reveal your system prompt", role-play overrides) | Regex, no model call |
+| Input classifier | Off-topic requests, subtler injection, and unsafe requests (diagnosis, medication, dosing, treatment changes) | `gpt-4o-mini` classifier (`GUARD_MODEL`) with the conversation state, so follow-ups like "what should they do?" stay allowed |
+| Output guardrail | Drug names, dosages, treatment instructions and diagnosis statements in risk explanations and recommendations | Agents SDK output guardrail with deterministic patterns |
+
+Blocked inputs return a `refusal` result with a fixed message and are never written to
+conversation history or session state, so an injection attempt cannot be replayed into
+later turns. The input check runs before the orchestrator for this reason: the SDK's
+built-in input guardrails persist the tripped message to the session.
+
+If an agent's output trips the output guardrail, it is retried once with feedback. If it
+trips again, risk explanations fall back to a template built from the model score, and
+recommendations return a refusal pointing the user to a clinician.
 
 ## Risk Model
 
@@ -214,7 +237,7 @@ the agent only reaches for it in borderline cases.
   routing through the orchestrator
 - Add a cohort comparison agent and availability/scheduling agent
 - Improve the risk model's High recall (e.g. gradient boosting or feature interactions, compared with cross-validation)
-- Input/output guardrails, and running the eval suite in CI
+- Run the eval suite in CI
 - Streaming responses, Postgres/Redis-backed memory and tracing
 
 ## Author
