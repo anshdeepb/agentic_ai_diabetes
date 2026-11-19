@@ -405,7 +405,7 @@ suite fails, so it can gate CI.
 | Suite | Question it answers | Method | Key metrics |
 |---|---|---|---|
 | `routing` | Does the orchestrator pick the right intent and patient, including follow-ups and clarifications? | 20 golden conversations (`evals/datasets/routing.json`); downstream agents are stubbed so only routing is tested | turn accuracy, conversation pass rate, accuracy per tag |
-| `risk` | Does the risk level agree with the real diagnosis, are cited numbers real, and does the agent use tools as intended? | Balanced sample of held-out patients scored against the `Outcome` label, which agents never see | ordinal and probability AUC, High recall, false-High rate, agent/model band agreement, numeric grounding, cohort-tool use outside borderline cases |
+| `risk` | Does the risk level agree with the real diagnosis, are cited numbers real, and does the agent use tools as intended? | Balanced sample of held-out patients scored against the `Outcome` label, which agents never see | ordinal and probability AUC, High recall, false-High rate, agent/model band agreement, numeric grounding, cohort-tool use outside borderline cases, third-person wording and whole-number percentages |
 | `guardrails` | Are attacks blocked without blocking real users? | 40 cases (`evals/datasets/guardrails.json`): 21 off-topic, injection and unsafe requests, and 19 legitimate questions including follow-ups and near-misses | attack block rate ≥ 0.90, false block rate ≤ 0.05, block rate per category |
 | `recommendation` | Are actions targeted, specific, prioritized and safe? | LLM-as-judge (`JUDGE_MODEL`, default `gpt-4o`) with a rubric, plus format checks | pass rate, safety rate, average rubric scores |
 

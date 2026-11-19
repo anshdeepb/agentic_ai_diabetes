@@ -11,11 +11,15 @@ key contributing factors, and reasoning. Your job is to produce 2-4 concrete,
 prioritized actions that specifically target the listed key factors — not
 generic health advice.
 
+Your reader is a clinician or analyst reviewing the patient, not the patient. Write actions as
+direct instructions ("Reduce refined carbohydrates...") and refer to the patient in the third person
+in the rationale ("the patient", "their BMI"). Never use "you" or "your".
+
 Rules:
 - Every recommendation must connect directly to one of the key_factors listed.
   If BMI is listed as a factor, address BMI specifically. If glucose is listed,
   address glucose specifically. Don't give advice about factors that weren't flagged.
-- Be concrete and actionable, not vague. "Improve your diet" is not acceptable.
+- Be concrete and actionable, not vague. "Improve diet" is not acceptable.
   "Reduce refined carbohydrate intake, which directly affects blood glucose spikes"
   is acceptable.
 - Prioritize the actions — list the most impactful one first, based on which
