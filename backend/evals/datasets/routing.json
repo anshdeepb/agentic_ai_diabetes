@@ -1,0 +1,121 @@
+[
+  {
+    "id": "risk_direct",
+    "tags": ["single_turn", "risk"],
+    "turns": [{"user": "What is patient 0's risk level?", "expect": {"type": "risk_assessment", "patient_id": "0"}}]
+  },
+  {
+    "id": "risk_phrased_look",
+    "tags": ["single_turn", "risk"],
+    "turns": [{"user": "How risky does patient 5 look?", "expect": {"type": "risk_assessment", "patient_id": "5"}}]
+  },
+  {
+    "id": "risk_imperative",
+    "tags": ["single_turn", "risk"],
+    "turns": [{"user": "Assess patient 120.", "expect": {"type": "risk_assessment", "patient_id": "120"}}]
+  },
+  {
+    "id": "risk_likelihood",
+    "tags": ["single_turn", "risk"],
+    "turns": [{"user": "Is patient 3 likely to develop diabetes?", "expect": {"type": "risk_assessment", "patient_id": "3"}}]
+  },
+  {
+    "id": "risk_informal_typo",
+    "tags": ["single_turn", "risk", "noisy"],
+    "turns": [{"user": "pt 15 risk lvl?", "expect": {"type": "risk_assessment", "patient_id": "15"}}]
+  },
+  {
+    "id": "risk_hash_id",
+    "tags": ["single_turn", "risk", "noisy"],
+    "turns": [{"user": "Patient #20, how concerned should we be?", "expect": {"type": "risk_assessment", "patient_id": "20"}}]
+  },
+  {
+    "id": "risk_cohort_phrasing",
+    "tags": ["single_turn", "risk"],
+    "turns": [{"user": "Compare patient 2 to others their age.", "expect": {"type": "risk_assessment", "patient_id": "2"}}]
+  },
+  {
+    "id": "rec_direct",
+    "tags": ["single_turn", "recommendation"],
+    "turns": [{"user": "What should patient 12 do to lower their risk?", "expect": {"type": "recommendation", "patient_id": "12"}}]
+  },
+  {
+    "id": "rec_action_plan",
+    "tags": ["single_turn", "recommendation"],
+    "turns": [{"user": "Give patient 42 a prioritized action plan.", "expect": {"type": "recommendation", "patient_id": "42"}}]
+  },
+  {
+    "id": "rec_lifestyle",
+    "tags": ["single_turn", "recommendation"],
+    "turns": [{"user": "Any lifestyle advice for patient 7?", "expect": {"type": "recommendation", "patient_id": "7"}}]
+  },
+  {
+    "id": "followup_pronoun_they",
+    "tags": ["multi_turn", "coreference"],
+    "turns": [
+      {"user": "What is patient 0's risk level?", "expect": {"type": "risk_assessment", "patient_id": "0"}},
+      {"user": "What should they do about it?", "expect": {"type": "recommendation", "patient_id": "0"}}
+    ]
+  },
+  {
+    "id": "followup_pronoun_she",
+    "tags": ["multi_turn", "coreference"],
+    "turns": [
+      {"user": "How risky is patient 8?", "expect": {"type": "risk_assessment", "patient_id": "8"}},
+      {"user": "And what should she do?", "expect": {"type": "recommendation", "patient_id": "8"}}
+    ]
+  },
+  {
+    "id": "followup_switch_patient",
+    "tags": ["multi_turn", "patient_switch"],
+    "turns": [
+      {"user": "Risk for patient 0?", "expect": {"type": "risk_assessment", "patient_id": "0"}},
+      {"user": "How about patient 5?", "expect": {"type": "risk_assessment", "patient_id": "5"}}
+    ]
+  },
+  {
+    "id": "followup_return_to_patient",
+    "tags": ["multi_turn", "patient_switch", "coreference"],
+    "turns": [
+      {"user": "What is patient 0's risk?", "expect": {"type": "risk_assessment", "patient_id": "0"}},
+      {"user": "And patient 5?", "expect": {"type": "risk_assessment", "patient_id": "5"}},
+      {"user": "Go back to patient 0. What should they do?", "expect": {"type": "recommendation", "patient_id": "0"}}
+    ]
+  },
+  {
+    "id": "followup_new_topic",
+    "tags": ["multi_turn", "patient_switch"],
+    "turns": [
+      {"user": "Patient 10 risk please.", "expect": {"type": "risk_assessment", "patient_id": "10"}},
+      {"user": "Different question: what should patient 11 do?", "expect": {"type": "recommendation", "patient_id": "11"}}
+    ]
+  },
+  {
+    "id": "followup_rec_then_risk",
+    "tags": ["multi_turn", "coreference"],
+    "turns": [
+      {"user": "What should patient 4 change first?", "expect": {"type": "recommendation", "patient_id": "4"}},
+      {"user": "How high is their risk overall?", "expect": {"type": "risk_assessment", "patient_id": "4"}}
+    ]
+  },
+  {
+    "id": "clarify_no_patient",
+    "tags": ["single_turn", "clarification"],
+    "turns": [{"user": "How risky is it?", "expect": {"type": "clarification"}}]
+  },
+  {
+    "id": "clarify_advice_no_patient",
+    "tags": ["single_turn", "clarification"],
+    "turns": [{"user": "What should they do to improve?", "expect": {"type": "clarification"}}]
+  },
+  {
+    "id": "clarify_unknown_patient",
+    "tags": ["single_turn", "clarification"],
+    "turns": [{"user": "Risk for patient 99999", "expect": {"type": "clarification"}}]
+  },
+  {
+    "id": "clarify_off_topic",
+    "tags": ["single_turn", "clarification", "off_topic"],
+    "turns": [{"user": "What's the weather like today?", "expect": {"type": "clarification"}}]
+  }
+]
