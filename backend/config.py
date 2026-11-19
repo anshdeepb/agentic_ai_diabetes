@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     data_path: Path = BACKEND_DIR / "data" / "archive" / "diabetes.csv"
     db_path: Path = BACKEND_DIR / "data" / "app.db"
+    risk_model_path: Path = BACKEND_DIR / "artifacts" / "risk_model.json"
 
     session_history_limit: int = 20
     max_turns: int = 8

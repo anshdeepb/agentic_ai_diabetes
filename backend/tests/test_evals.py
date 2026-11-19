@@ -53,6 +53,11 @@ def test_numeric_claims_still_catch_patient_values_after_reference_sentence():
     assert not claims[0].grounded
 
 
+def test_numeric_claims_skip_threshold_comparisons():
+    claims = extract_numeric_claims("BMI 33.6, Obese (BMI >= 30), glucose ≥ 140 threshold", FEATURES)
+    assert [c.claimed for c in claims] == [33.6]
+
+
 def test_numeric_claims_ignore_text_without_feature_numbers():
     assert extract_numeric_claims("Elevated glucose and high BMI", FEATURES) == []
 
@@ -114,7 +119,8 @@ async def test_suites_run_end_to_end_with_fake_runner(suite_name, fake_runner, s
         assert metrics["turn_accuracy"] == 1.0
     elif suite_name == "risk":
         assert metrics["error_rate"] == 0.0
-        assert 0.0 <= metrics["ordinal_auc"] <= 1.0
+        assert 0.0 <= metrics["model_ordinal_auc"] <= 1.0
+        assert metrics["model_heldout_size"] > 100
     else:
         assert metrics["pass_rate"] == 1.0
         assert metrics["safety_rate"] == 1.0

@@ -32,7 +32,7 @@ function MetaTag({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   )
 }
 
-function RiskPill({ level }: { level: RiskLevel }) {
+function RiskPill({ level, score }: { level: RiskLevel; score: number | null }) {
   const style = RISK_STYLES[level]
   return (
     <span
@@ -43,6 +43,7 @@ function RiskPill({ level }: { level: RiskLevel }) {
     >
       <span className={cn("size-1.5 rounded-full", style.dot)} />
       {level} risk
+      {score !== null && <span className="font-normal opacity-80 tabular-nums">· {Math.round(score * 100)}%</span>}
     </span>
   )
 }
@@ -52,7 +53,7 @@ function AssessmentView({ assessment, fromCache }: { assessment: RiskAssessment;
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h3 className="text-base font-semibold tracking-tight">Patient {assessment.patient_id}</h3>
-        <RiskPill level={assessment.risk_level} />
+        <RiskPill level={assessment.risk_level} score={assessment.risk_score} />
       </div>
 
       <p className="text-[15px] leading-relaxed">{assessment.reasoning}</p>
@@ -75,6 +76,13 @@ function AssessmentView({ assessment, fromCache }: { assessment: RiskAssessment;
           {assessment.used_cohort_context && <MetaTag icon={<Users />}>Compared with age cohort</MetaTag>}
           {fromCache && <MetaTag icon={<History />}>Reused from earlier in this chat</MetaTag>}
         </div>
+      )}
+
+      {assessment.risk_score !== null && (
+        <p className="text-xs text-muted-foreground">
+          Score from a logistic regression model trained on this dataset
+          {assessment.model_version ? ` (${assessment.model_version})` : ""}. A screening estimate, not a diagnosis.
+        </p>
       )}
     </div>
   )

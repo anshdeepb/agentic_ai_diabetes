@@ -1,9 +1,11 @@
+import json
 import os
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from agents import ToolCallItem
 
 _TMP = Path(tempfile.mkdtemp())
 os.environ["DB_PATH"] = str(_TMP / "test.db")
@@ -15,7 +17,7 @@ from pipeline.schemas import (
     Intent,
     OrchestratorDecision,
     Recommendation,
-    RiskAssessment,
+    RiskExplanation,
     RiskLevel,
 )
 
@@ -34,6 +36,8 @@ class FakeRunner:
     def __init__(self):
         self.calls: list[str] = []
         self.decisions: list[OrchestratorDecision] = []
+        self.risk_agent_level: RiskLevel | None = None
+        self.risk_tools_called: list[str] = []
 
     def queue(self, intent: Intent, patient_id: str | None):
         self.decisions.append(OrchestratorDecision(intent=intent, patient_id=patient_id, reasoning="test"))
@@ -46,14 +50,17 @@ class FakeRunner:
                 await session.add_items([{"role": "user", "content": input}])
             return SimpleNamespace(final_output=self.decisions.pop(0))
         if agent.name == "Risk":
+            band = json.loads(input)["model_score"]["risk_band"]
             return SimpleNamespace(
-                final_output=RiskAssessment(
-                    patient_id="wrong",
-                    risk_level=RiskLevel.high,
+                final_output=RiskExplanation(
+                    risk_level=self.risk_agent_level or RiskLevel(band),
                     key_factors=["Glucose 148"],
                     reasoning="High glucose.",
-                    used_cohort_context=False,
-                )
+                ),
+                new_items=[
+                    ToolCallItem(agent=agent, raw_item={"type": "function_call", "name": n, "call_id": n, "arguments": "{}"})
+                    for n in self.risk_tools_called
+                ],
             )
         if agent.name == "Recommendation":
             return SimpleNamespace(
