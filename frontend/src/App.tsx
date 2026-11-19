@@ -4,45 +4,60 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
-import {
-  Message,
-  MessageContent,
-} from "@/components/ai-elements/message"
+import { Message, MessageContent } from "@/components/ai-elements/message"
 import {
   PromptInput,
   PromptInputTextarea,
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input"
-import { sendQuery } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { ApiError, deleteSession, getSessionId, newSessionId, sendMessage } from "@/lib/api"
 import AssistantResult from "@/components/AssistantResult"
 import type { ChatMessage } from "@/types/message"
 
 export default function App() {
+  const [sessionId, setSessionId] = useState(getSessionId)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
-  const [status, setStatus] = useState<"ready" | "streaming">("ready")
+  const [status, setStatus] = useState<"ready" | "submitted" | "error">("ready")
 
   const handleSubmit = async () => {
-    if (!input.trim()) return
+    const query = input.trim()
+    if (!query || status === "submitted") return
 
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content: input }
-    setMessages((prev) => [...prev, userMessage])
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: query }])
     setInput("")
-    setStatus("streaming")
+    setStatus("submitted")
 
-    const result = await sendQuery(userMessage.content as string)
+    try {
+      const result = await sendMessage(sessionId, query)
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: result }])
+      setStatus("ready")
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Something went wrong. Please try again."
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "error", content: message }])
+      setStatus("error")
+    }
+  }
 
-    const assistantMessage: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content: result }
-    setMessages((prev) => [...prev, assistantMessage])
+  const handleNewChat = async () => {
+    await deleteSession(sessionId)
+    setSessionId(newSessionId())
+    setMessages([])
     setStatus("ready")
   }
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="border-b border-border/50 px-6 py-4">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-sm font-medium">Diabetes Risk Assistant</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Ask about a patient's risk or recommendations</p>
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-sm font-medium">Diabetes Risk Assistant</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Ask about a patient's risk or recommendations</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleNewChat} disabled={status === "submitted"}>
+            New chat
+          </Button>
         </div>
       </header>
 
@@ -51,13 +66,17 @@ export default function App() {
           <ConversationContent>
             {messages.length === 0 && (
               <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Try: "What is patient 0's risk level?"</p>
+                <p className="text-sm text-muted-foreground">
+                  Try: "What is patient 0's risk level?" then "What should they do about it?"
+                </p>
               </div>
             )}
             {messages.map((m) => (
-              <Message from={m.role} key={m.id}>
+              <Message from={m.role === "user" ? "user" : "assistant"} key={m.id}>
                 <MessageContent>
-                  {typeof m.content === "string" ? m.content : <AssistantResult result={m.content} />}
+                  {m.role === "user" && m.content}
+                  {m.role === "assistant" && <AssistantResult result={m.content} />}
+                  {m.role === "error" && <p className="text-sm text-rose-400">{m.content}</p>}
                 </MessageContent>
               </Message>
             ))}
@@ -71,7 +90,7 @@ export default function App() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about a patient..."
           />
-          <PromptInputSubmit status={status} disabled={!input.trim()} className="mr-1" />
+          <PromptInputSubmit status={status} disabled={!input.trim() || status === "submitted"} className="mr-1" />
         </PromptInput>
       </div>
     </div>

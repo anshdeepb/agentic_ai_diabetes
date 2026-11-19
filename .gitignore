@@ -3,12 +3,17 @@
 
 # Python
 backend/venv/
+backend/.venv/
+.pytest_cache/
 backend/__pycache__/
 backend/**/__pycache__/
 *.pyc
 
 # Environment variables
 backend/.env
+
+# Local databases
+backend/data/*.db
 
 # Node
 frontend/node_modules/
