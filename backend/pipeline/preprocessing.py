@@ -1,22 +1,39 @@
-import pandas as pd
+from functools import lru_cache
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
 
-def load_data() -> pd.DataFrame:
-    df = pd.read_csv('./data/archive/diabetes.csv')
-    df = df.dropna().drop_duplicates()
+from config import get_settings
 
-    zeroes_as_missing_cols = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'Age']
-    df[zeroes_as_missing_cols] = df[zeroes_as_missing_cols].replace(0, np.nan)
+ZERO_AS_MISSING_COLS = ["Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "Age"]
 
-    df = df.dropna(subset='Glucose')
-    df['BloodPressure'] = df['BloodPressure'].fillna(df['BloodPressure'].median())
-    df['SkinThickness'] = df['SkinThickness'].fillna(df['SkinThickness'].median())
-    df['Insulin'] = df['Insulin'].fillna(df['Insulin'].median())
-    df = df.dropna(subset='BMI')
+FEATURE_COLUMNS = [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age",
+]
 
-    df = df.reset_index(drop=True)
-    df['Patient_ID'] = df.index.astype(str)
 
-    return df
+def load_data(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    df["Patient_ID"] = df.index.astype(str)
 
-df = load_data()
+    df = df.dropna(subset=FEATURE_COLUMNS).drop_duplicates(subset=FEATURE_COLUMNS)
+    df[ZERO_AS_MISSING_COLS] = df[ZERO_AS_MISSING_COLS].replace(0, np.nan)
+
+    df = df.dropna(subset=["Glucose", "BMI"])
+    for col in ["BloodPressure", "SkinThickness", "Insulin"]:
+        df[col] = df[col].fillna(df[col].median())
+
+    return df.reset_index(drop=True)
+
+
+@lru_cache
+def get_dataframe() -> pd.DataFrame:
+    return load_data(get_settings().data_path)

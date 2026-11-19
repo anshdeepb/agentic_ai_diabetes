@@ -27,14 +27,29 @@ Rather than a single LLM call, the system is composed of three cooperating agent
 ![architecture](docs/agentic_ai_diabetes.svg)
 
 **Flow:**
-1. User submits a natural language query (e.g. *"How risky does patient 0 look?"*)
-2. Orchestrator classifies intent: risk assessment only, recommendation only,
-   or recommendation requiring a fresh risk assessment first
-3. Risk Agent is invoked with tool access to patient records and cohort averages,
-   deciding for itself whether cohort comparison is needed
-4. If a recommendation was requested, the Risk Agent's structured output is
-   passed to the Recommendation Agent, which produces targeted advice
-5. Final structured result is returned to the user
+1. User submits a natural language query within a chat session (e.g. *"How risky does patient 0 look?"*)
+2. Orchestrator reads the conversation history and session state, classifies intent
+   (`risk_only` or `recommendation`) and resolves the patient, including follow-ups
+   like *"what should they do?"*
+3. If the patient has a cached assessment whose data, prompt version and model are
+   unchanged, it is reused; otherwise the Risk Agent runs with tool access to patient
+   records and cohort averages, deciding for itself whether cohort comparison is needed
+4. If a recommendation was requested, the structured assessment is passed to the
+   Recommendation Agent, which produces targeted advice
+5. A typed result (`risk_assessment`, `recommendation` or `clarification`) is returned,
+   and a compact summary is written back to conversation memory
+
+## Memory & Context Management
+
+| Layer | Purpose | Implementation |
+|---|---|---|
+| Conversation memory | What was said | Agents SDK `SQLiteSession`, capped at `SESSION_HISTORY_LIMIT` items per turn |
+| Working state | What the system knows: active patient, cached assessments | `ConversationState` in `memory/state.py`, injected into the orchestrator prompt as a one-line summary |
+| Context isolation | Each agent sees only what it needs | Sub-agents never receive the transcript; the Recommendation Agent only gets the structured assessment |
+
+Assessments are cached under `(patient_id, record_hash, prompt_version, model)`, so a
+follow-up recommendation skips a full risk-agent run. Large tool outputs are never
+replayed into history; only a short result summary is stored.
 
 ## Tech Stack
 
@@ -42,7 +57,9 @@ Rather than a single LLM call, the system is composed of three cooperating agent
 - **OpenAI Agents SDK** — agent orchestration, tool-calling, structured outputs
 - **Pydantic** — schema definition and validation for all agent outputs
 - **Pandas** — data cleaning and cohort/record lookups
-- **GPT-4o-mini** — underlying model for all agents
+- **FastAPI** — versioned REST API with typed, discriminated responses
+- **React + TypeScript** — chat frontend
+- **GPT-4o-mini** — default model for all agents, configurable per role
 
 ## Data
 
@@ -54,7 +71,8 @@ Cleaning steps applied:
   `Insulin`, `BMI`)
 - Dropped rows with small counts of missing values (under ~5% missing)
 - Median-imputed columns with larger gaps in missing data (`SkinThickness`, `Insulin`)
-- Added a synthetic `patient_id` for record lookup
+- `patient_id` is the row's position in the source CSV, assigned before cleaning so ids stay stable
+- The `Outcome` label is never exposed to agents, so the risk assessment cannot read the answer
 
 > Note: a Snowflake medallion architecture (bronze/silver/gold) was designed
 > for this pipeline as a planned extension; the current implementation runs
@@ -64,31 +82,53 @@ Cleaning steps applied:
 
 1. Clone the repo:
 ```bash
-   git clone https://github.com/anshdeepb/agentic_ai_diabetes.git
-   cd agentic_ai_diabetes
+git clone https://github.com/anshdeepb/agentic_ai_diabetes.git
+cd agentic_ai_diabetes/backend
 ```
 
 2. Create a virtual environment and install dependencies:
 ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
 ```
 
-3. Create a `.env` file in the project root with your OpenAI API key:
+3. Create `backend/.env` with your OpenAI API key. Any setting in `backend/config.py`
+   can be overridden here too (e.g. `DEFAULT_MODEL`, `RISK_MODEL`, `SESSION_HISTORY_LIMIT`):
 ```
-   OPENAI_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
 ```
 
-## Example Usage
-
-```python
-result = await orchestrate("How risky does patient 0 look?")
-# → Returns a structured RiskAssessment: risk level, key factors, reasoning
-
-result = await orchestrate("What should patient 0 do to improve their health?")
-# → Chains through Risk Assessment, then returns a structured Recommendation
+4. Run the API and the frontend:
+```bash
+uvicorn main:app --reload
 ```
+```bash
+cd ../frontend && npm install && npm run dev
+```
+
+## API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/sessions/{session_id}/messages` | Send a query; body `{"query": "..."}` |
+| `DELETE` | `/v1/sessions/{session_id}` | Clear a session's history and state |
+| `GET` | `/healthz` | Liveness check |
+
+```json
+{
+  "session_id": "3f6c...",
+  "result": { "type": "risk_assessment", "assessment": { "...": "..." }, "from_cache": false }
+}
+```
+
+## Testing
+
+```bash
+pytest
+```
+Unit and API tests run without network access by stubbing the agent runner.
+`python scripts/smoke_test.py` runs a live three-turn conversation against the model.
 
 ![example_usage](docs/example_usage.png)
 
@@ -107,8 +147,9 @@ borderline case rather than following a fixed sequence every time.
 - Add role-based agents (patient, doctor, scheduling staff) with access-controlled
   routing through the orchestrator
 - Add a cohort comparison agent and availability/scheduling agent
-- Persist conversation state so `recommendation_only` queries can reuse a prior
-  risk assessment instead of always re-running it
+- Deterministic risk-score model exposed as a tool, with the LLM explaining the score
+- Input/output guardrails and an offline eval suite in CI
+- Streaming responses, Postgres/Redis-backed memory and tracing
 
 ## Author
 

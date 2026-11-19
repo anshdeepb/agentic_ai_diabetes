@@ -1,7 +1,9 @@
-from agents import Agent, Runner
+from agents import Agent, ModelSettings
+
+from pipeline.models import get_model
 from pipeline.schemas import Recommendation
 
-prompt = """You are a lifestyle recommendation agent for diabetes risk management.
+RECOMMENDATION_PROMPT = """You are a lifestyle recommendation agent for diabetes risk management.
 
 You will receive a structured risk assessment containing a risk level, a list of
 key contributing factors, and reasoning. Your job is to produce 2-4 concrete,
@@ -25,7 +27,8 @@ Rules:
 
 recommendation_agent = Agent(
     name="Recommendation",
-    instructions=prompt,
-    model="gpt-4o-mini",
-    output_type=Recommendation
+    instructions=RECOMMENDATION_PROMPT,
+    model=get_model("recommendation"),
+    model_settings=ModelSettings(temperature=0.3),
+    output_type=Recommendation,
 )

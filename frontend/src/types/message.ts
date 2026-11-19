@@ -14,8 +14,17 @@ export interface Recommendation {
   rationale: string
 }
 
-export interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string | RiskAssessment | Recommendation
+export type PipelineResult =
+  | { type: "risk_assessment"; assessment: RiskAssessment; from_cache: boolean }
+  | { type: "recommendation"; assessment: RiskAssessment; recommendation: Recommendation; from_cache: boolean }
+  | { type: "clarification"; message: string }
+
+export interface QueryResponse {
+  session_id: string
+  result: PipelineResult
 }
+
+export type ChatMessage =
+  | { id: string; role: "user"; content: string }
+  | { id: string; role: "assistant"; content: PipelineResult }
+  | { id: string; role: "error"; content: string }
