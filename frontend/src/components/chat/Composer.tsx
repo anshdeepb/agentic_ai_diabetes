@@ -25,13 +25,13 @@ export default function Composer({ value, onChange, onSubmit, busy, autoFocus }:
           onChange={(e) => onChange(e.target.value)}
           placeholder="Ask about a patient's risk or next steps…"
           autoFocus={autoFocus}
-          className="min-h-14 px-4 pt-3.5 text-[0.9375rem] leading-relaxed"
+          className="min-h-14 px-4 pt-3.5 text-[0.9375rem] leading-relaxed md:text-[0.9375rem] xl:min-h-16 xl:max-h-64 xl:px-5 xl:pt-4 xl:text-base"
         />
-        <PromptInputFooter className="justify-end px-2.5 pb-2.5">
+        <PromptInputFooter className="justify-end px-2.5 pb-2.5 xl:px-3 xl:pb-3">
           <PromptInputSubmit
             status={busy ? "submitted" : "ready"}
             disabled={!value.trim() || busy}
-            className="rounded-full"
+            className="rounded-full xl:size-9 xl:[&_svg]:size-[1.125rem]"
           />
         </PromptInputFooter>
       </PromptInput>
