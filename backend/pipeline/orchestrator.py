@@ -11,6 +11,7 @@ from pipeline.schemas import (
     Intent,
     OrchestratorDecision,
     PipelineResult,
+    Recommendation,
     RecommendationResult,
     RiskAssessment,
     RiskAssessmentResult,
@@ -69,6 +70,15 @@ async def get_or_create_assessment(
     return assessment, False
 
 
+async def create_recommendation(assessment: RiskAssessment) -> Recommendation:
+    run = await Runner.run(
+        recommendation_agent,
+        assessment.model_dump_json(),
+        max_turns=get_settings().max_turns,
+    )
+    return run.final_output.model_copy(update={"patient_id": assessment.patient_id})
+
+
 def summarize_result(result: PipelineResult) -> str:
     if isinstance(result, ClarificationResult):
         return result.message
@@ -107,12 +117,7 @@ async def orchestrate(query: str, session_id: str, store: StateStore) -> Pipelin
         if decision.intent == Intent.risk_only:
             result = RiskAssessmentResult(assessment=assessment, from_cache=from_cache)
         else:
-            rec_run = await Runner.run(
-                recommendation_agent,
-                assessment.model_dump_json(),
-                max_turns=settings.max_turns,
-            )
-            recommendation = rec_run.final_output.model_copy(update={"patient_id": patient_id})
+            recommendation = await create_recommendation(assessment)
             result = RecommendationResult(
                 assessment=assessment, recommendation=recommendation, from_cache=from_cache
             )

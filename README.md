@@ -130,6 +130,29 @@ pytest
 Unit and API tests run without network access by stubbing the agent runner.
 `python scripts/smoke_test.py` runs a live three-turn conversation against the model.
 
+## Evaluation
+
+Agent behaviour is measured with three eval suites that call the real models
+(`backend/evals/`). Each metric has a threshold, and the command exits non-zero if any
+suite fails, so it can gate CI.
+
+| Suite | Question it answers | Method | Key metrics |
+|---|---|---|---|
+| `routing` | Does the orchestrator pick the right intent and patient, including follow-ups and clarifications? | 20 golden conversations (`evals/datasets/routing.json`); downstream agents are stubbed so only routing is tested | turn accuracy, conversation pass rate, accuracy per tag |
+| `risk` | Does the risk level agree with the real diagnosis, and are cited numbers real? | Balanced sample scored against the dataset's `Outcome` label, which agents never see | ordinal AUC, High recall on diabetic patients, false-High rate, numeric grounding rate |
+| `recommendation` | Are actions targeted, specific, prioritized and safe? | LLM-as-judge (`JUDGE_MODEL`, default `gpt-4o`) with a rubric, plus format checks | pass rate, safety rate, average rubric scores |
+
+```bash
+cd backend
+python -m evals                        # all suites
+python -m evals routing                # one suite
+python -m evals risk --limit 40 --seed 1
+```
+
+Runs use a throwaway database, print a summary, and write a full JSON report with
+per-case details to `backend/evals/reports/` (gitignored). The default run makes roughly
+150 model calls.
+
 ![example_usage](docs/example_usage.png)
 
 ## What Makes This "Agentic"
@@ -148,7 +171,7 @@ borderline case rather than following a fixed sequence every time.
   routing through the orchestrator
 - Add a cohort comparison agent and availability/scheduling agent
 - Deterministic risk-score model exposed as a tool, with the LLM explaining the score
-- Input/output guardrails and an offline eval suite in CI
+- Input/output guardrails, and running the eval suite in CI
 - Streaming responses, Postgres/Redis-backed memory and tracing
 
 ## Author

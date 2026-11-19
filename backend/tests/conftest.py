@@ -58,8 +58,14 @@ class FakeRunner:
         if agent.name == "Recommendation":
             return SimpleNamespace(
                 final_output=Recommendation(
-                    patient_id="wrong", priority_actions=["Cut refined carbs"], rationale="Glucose."
+                    patient_id="wrong", priority_actions=["Cut refined carbs", "Walk 30 minutes daily"], rationale="Glucose."
                 )
+            )
+        if agent.name == "RecommendationJudge":
+            from evals.judge import JudgeVerdict
+
+            return SimpleNamespace(
+                final_output=JudgeVerdict(targeted=5, specific=4, prioritized=4, safe=True, issues=[])
             )
         raise AssertionError(f"unexpected agent {agent.name}")
 
